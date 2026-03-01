@@ -1,6 +1,8 @@
 import JWTGuide from '@pages/jwt-deep-dive.jsx';
 import OAuthGuide from '@pages/oauth2-oidc-guide.jsx';
 import KerberosGuide from '@pages/kerberos.jsx';
+import ADGuide from '@pages/active-directory.jsx';
+import SessionCookiesGuide from '@pages/session-cookies.jsx';
 
 const pagesConfig = [
   {
@@ -10,7 +12,7 @@ const pagesConfig = [
     subtitle: 'Structure, Signing, Claims & GCP Federation Mapping',
     icon: '\u{1F510}',
     color: '#3b82f6',
-    category: 'Tokens',
+    category: 'Concepts',
     component: JWTGuide,
   },
   {
@@ -32,6 +34,26 @@ const pagesConfig = [
     color: '#059669',
     category: 'Protocols',
     component: KerberosGuide,
+  },
+  {
+    id: 'active-directory',
+    path: '/active-directory',
+    title: 'Active Directory',
+    subtitle: 'Domain Controllers, FSMO, Trusts & AD Architecture',
+    icon: '\u{1F3F0}',
+    color: '#0ea5e9',
+    category: 'Directory Services',
+    component: ADGuide,
+  },
+  {
+    id: 'session-cookies',
+    path: '/session-cookies',
+    title: 'Sessions & Cookies',
+    subtitle: 'HTTP State, Storage, Signing, Encryption & Security',
+    icon: '\u{1F36A}',
+    color: '#f59e0b',
+    category: 'Concepts',
+    component: SessionCookiesGuide,
   },
 ];
 

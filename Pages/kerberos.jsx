@@ -197,6 +197,81 @@ const BrowserDiagram = () => {
   );
 };
 
+/* ── Keytab → ADFS Token Sequence Diagram ── */
+const KeytabAdfsDiagram = () => {
+  const W = 820, H = 620;
+  const actors = [
+    { label: "Python Script", sub: "(requests-kerberos)", x: 80, c: "#2563EB", bg: "#EFF6FF" },
+    { label: "GSSAPI / Keytab", sub: "(libkrb5)", x: 250, c: "#7C3AED", bg: "#F5F3FF" },
+    { label: "KDC", sub: "(Domain Controller)", x: 440, c: "#9333EA", bg: "#FAF5FF" },
+    { label: "ADFS Server", sub: "(adfs.company.com)", x: 640, c: "#059669", bg: "#ECFDF5" },
+  ];
+  const msgs = [
+    { f: 0, t: 1, y: 95,  lbl: "1. kinit -kt keytab", sub: "Read key from keytab file", c: "#2563EB" },
+    { f: 1, t: 2, y: 150, lbl: "2. AS-REQ", sub: "Pre-auth timestamp encrypted with keytab key", c: "#7C3AED" },
+    { f: 2, t: 1, y: 205, lbl: "3. AS-REP → TGT", sub: "TGT + Session Key → stored in ccache file", c: "#9333EA" },
+    { f: 0, t: 3, y: 270, lbl: "4. HTTP GET /authorize", sub: "OAuth2 authorize request (no auth header yet)", c: "#2563EB" },
+    { f: 3, t: 0, y: 325, lbl: "5. 401 Negotiate", sub: "WWW-Authenticate: Negotiate", c: "#DC2626" },
+    { f: 0, t: 1, y: 380, lbl: "6. GSSAPI init_sec_ctx()", sub: "Need Service Ticket for HTTP/adfs.company.com", c: "#2563EB" },
+    { f: 1, t: 2, y: 425, lbl: "7. TGS-REQ", sub: "TGT + SPN → get Service Ticket for ADFS", c: "#7C3AED" },
+    { f: 2, t: 1, y: 470, lbl: "8. TGS-REP", sub: "Service Ticket (enc w/ ADFS service key)", c: "#9333EA" },
+    { f: 0, t: 3, y: 530, lbl: "9. Authorization: Negotiate", sub: "SPNEGO token containing Kerberos AP-REQ", c: "#2563EB" },
+    { f: 3, t: 0, y: 585, lbl: "10. 302 + auth code", sub: "ADFS validates Kerberos → issues OAuth2 code → exchange for tokens", c: "#059669" },
+  ];
+  const markerColors = {
+    "#2563EB": "kt-blue", "#7C3AED": "kt-purple", "#9333EA": "kt-dpurple",
+    "#059669": "kt-green", "#DC2626": "kt-red",
+  };
+  return (
+    <div className="overflow-x-auto my-5">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[750px]" style={{ maxHeight: 640 }}>
+        <defs>
+          {Object.entries(markerColors).map(([color, id]) => (
+            <marker key={id} id={id} markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill={color} />
+            </marker>
+          ))}
+          <filter id="kts" x="-4%" y="-4%" width="108%" height="108%"><feDropShadow dx="1" dy="1" stdDeviation="2" floodOpacity="0.1"/></filter>
+        </defs>
+        {/* Actor boxes + lifelines */}
+        {actors.map((a, i) => (
+          <g key={i}>
+            <rect x={a.x - 60} y={10} width={120} height={48} rx={8} fill={a.bg} stroke={a.c} strokeWidth={2} filter="url(#kts)" />
+            <text x={a.x} y={30} textAnchor="middle" fontSize={11} fontWeight="bold" fill={a.c}>{a.label}</text>
+            <text x={a.x} y={44} textAnchor="middle" fontSize={8.5} fill={a.c} opacity={0.7}>{a.sub}</text>
+            <line x1={a.x} y1={58} x2={a.x} y2={H - 5} stroke={a.c} strokeWidth={1.5} strokeDasharray="6,4" opacity={0.3} />
+          </g>
+        ))}
+        {/* Phase backgrounds */}
+        <rect x={5} y={78} width={W - 10} height={145} rx={6} fill="#F5F3FF" opacity={0.3} />
+        <text x={15} y={91} fontSize={9} fontWeight="bold" fill="#5B21B6" opacity={0.7}>PHASE 1 — Keytab → TGT (kinit)</text>
+        <rect x={5} y={250} width={W - 10} height={92} rx={6} fill="#FEF2F2" opacity={0.3} />
+        <text x={15} y={263} fontSize={9} fontWeight="bold" fill="#991B1B" opacity={0.7}>PHASE 2 — ADFS Negotiate Challenge</text>
+        <rect x={5} y={362} width={W - 10} height={130} rx={6} fill="#FAF5FF" opacity={0.3} />
+        <text x={15} y={375} fontSize={9} fontWeight="bold" fill="#5B21B6" opacity={0.7}>PHASE 3 — GSSAPI gets Service Ticket</text>
+        <rect x={5} y={512} width={W - 10} height={95} rx={6} fill="#ECFDF5" opacity={0.3} />
+        <text x={15} y={525} fontSize={9} fontWeight="bold" fill="#065F46" opacity={0.7}>PHASE 4 — Authenticated → Token Issued</text>
+        {/* Messages */}
+        {msgs.map((m, i) => {
+          const x1 = actors[m.f].x, x2 = actors[m.t].x;
+          const dir = x2 > x1 ? 1 : -1;
+          const lx1 = x1 + dir * 8, lx2 = x2 - dir * 8;
+          const mid = (lx1 + lx2) / 2;
+          const mkr = `url(#${markerColors[m.c] || "kt-blue"})`;
+          return (
+            <g key={i}>
+              <line x1={lx1} y1={m.y} x2={lx2} y2={m.y} stroke={m.c} strokeWidth={2} markerEnd={mkr} />
+              <rect x={mid - 70} y={m.y - 22} width={140} height={16} rx={4} fill={m.c} opacity={0.85} />
+              <text x={mid} y={m.y - 11} textAnchor="middle" fontSize={9} fontWeight="bold" fill="white">{m.lbl}</text>
+              <text x={mid} y={m.y + 14} textAnchor="middle" fontSize={8} fill="#4B5563">{m.sub}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
+
 export default function KerberosGuide() {
   const [active, setActive] = useState(0);
   const [exp, setExp] = useState({});
@@ -437,6 +512,206 @@ export default function KerberosGuide() {
           <WarnBox><strong>Keytab = Password equivalent!</strong> Anyone with the keytab file can authenticate as that principal. Protect keytabs with strict file permissions (chmod 600, owned by the service user). Never commit keytabs to git or share them. Rotate the associated password periodically (which invalidates old keytabs).</WarnBox>
 
           <Analogy>A keytab is like a <strong>master key card</strong> for a building. Normal employees type a PIN (password) at the door. But the night security guard has a key card (keytab) that opens the door without a PIN. The door lock (KDC) can't tell the difference — both produce the same signal. But if someone steals that key card, they can walk right in.</Analogy>
+
+          {/* ── Practical: Keytab → Cache → ADFS Token ── */}
+          <h3 className="text-lg font-bold mb-3 mt-8 text-gray-800">Practical: Keytab → Kerberos Cache → ADFS Token</h3>
+          <p className="text-sm text-gray-600 mb-4">A complete end-to-end example: use a keytab to create a Kerberos credential cache, then use <code className="bg-gray-100 px-1 rounded text-xs font-mono">requests-kerberos</code> to obtain an ADFS token for a cloud application — all without a password prompt.</p>
+
+          <KeytabAdfsDiagram />
+
+          <div className="flex flex-col gap-3 mb-5">
+            <StepCard num="1" title="Create the keytab for your service account" color="bg-blue-50 border-blue-200" expanded={exp.ka1} onToggle={() => toggle('ka1')}
+              desc="Generate a keytab file from AD for the service principal."
+              detail={<div>
+                <p className="mb-2 font-bold text-xs">On the Domain Controller (ktpass):</p>
+                <div className="font-mono text-xs bg-white bg-opacity-50 p-3 rounded mb-3 overflow-x-auto">
+                  <p>ktpass -princ HTTP/myapp.company.com@COMPANY.COM \</p>
+                  <p>  -mapuser COMPANY\svc-myapp \</p>
+                  <p>  -pass 'S3cur3P@ss!' \</p>
+                  <p>  -crypto AES256-SHA1 \</p>
+                  <p>  -ptype KRB5_NT_PRINCIPAL \</p>
+                  <p>  -out C:\keytabs\svc-myapp.keytab</p>
+                </div>
+                <p className="mb-2 font-bold text-xs">Or on Linux (ktutil):</p>
+                <div className="font-mono text-xs bg-white bg-opacity-50 p-3 rounded overflow-x-auto">
+                  <p>$ ktutil</p>
+                  <p>ktutil: addent -password -p svc-myapp@COMPANY.COM \</p>
+                  <p>  -k 1 -e aes256-cts-hmac-sha1-96</p>
+                  <p>Password: ****</p>
+                  <p>ktutil: wkt /etc/krb5/svc-myapp.keytab</p>
+                  <p>ktutil: quit</p>
+                  <p className="mt-2 text-green-700"># Secure the file</p>
+                  <p>$ chmod 600 /etc/krb5/svc-myapp.keytab</p>
+                  <p>$ chown svc-myapp:svc-myapp /etc/krb5/svc-myapp.keytab</p>
+                </div>
+              </div>} />
+
+            <StepCard num="2" title="Initialize the Kerberos credential cache (kinit)" color="bg-purple-50 border-purple-200" expanded={exp.ka2} onToggle={() => toggle('ka2')}
+              desc="Use kinit with the keytab to get a TGT — no password needed."
+              detail={<div>
+                <div className="font-mono text-xs bg-white bg-opacity-50 p-3 rounded mb-3 overflow-x-auto">
+                  <p className="text-green-700"># Initialize cache from keytab (no password prompt!)</p>
+                  <p>$ kinit -kt /etc/krb5/svc-myapp.keytab svc-myapp@COMPANY.COM</p>
+                  <p></p>
+                  <p className="text-green-700"># Verify the TGT is cached</p>
+                  <p>$ klist</p>
+                  <p>Ticket cache: FILE:/tmp/krb5cc_1001</p>
+                  <p>Default principal: svc-myapp@COMPANY.COM</p>
+                  <p></p>
+                  <p>Valid starting       Expires              Service principal</p>
+                  <p>03/01/2026 08:00:00  03/01/2026 18:00:00  krbtgt/COMPANY.COM@COMPANY.COM</p>
+                  <p>        renew until 03/08/2026 08:00:00</p>
+                </div>
+                <p className="text-xs mb-2">The credential cache (ccache) is now at <code className="bg-white px-1 rounded">/tmp/krb5cc_1001</code>. This file contains the TGT and session key — your Python script will use this automatically.</p>
+                <div className="bg-amber-50 rounded-lg p-3 text-xs">
+                  <p className="font-bold text-amber-800 mb-1">Automating with cron:</p>
+                  <div className="font-mono bg-white bg-opacity-60 p-2 rounded">
+                    <p># Renew TGT every 4 hours (before the 10h TGT expires)</p>
+                    <p>0 */4 * * * /usr/bin/kinit -kt /etc/krb5/svc-myapp.keytab svc-myapp@COMPANY.COM</p>
+                  </div>
+                </div>
+              </div>} />
+
+            <StepCard num="3" title="Configure krb5.conf for your realm" color="bg-indigo-50 border-indigo-200" expanded={exp.ka3} onToggle={() => toggle('ka3')}
+              desc="Ensure your Linux machine knows about the AD realm and KDC."
+              detail={<div>
+                <p className="mb-2 text-xs font-bold">/etc/krb5.conf:</p>
+                <div className="font-mono text-xs bg-white bg-opacity-50 p-3 rounded overflow-x-auto">
+                  <p>[libdefaults]</p>
+                  <p>    default_realm = COMPANY.COM</p>
+                  <p>    dns_lookup_realm = false</p>
+                  <p>    dns_lookup_kdc = true</p>
+                  <p>    forwardable = true</p>
+                  <p></p>
+                  <p>[realms]</p>
+                  <p>    COMPANY.COM = {"{"}</p>
+                  <p>        kdc = dc01.company.com</p>
+                  <p>        kdc = dc02.company.com</p>
+                  <p>        admin_server = dc01.company.com</p>
+                  <p>    {"}"}</p>
+                  <p></p>
+                  <p>[domain_realm]</p>
+                  <p>    .company.com = COMPANY.COM</p>
+                  <p>    company.com = COMPANY.COM</p>
+                </div>
+              </div>} />
+
+            <StepCard num="4" title="Python: Use requests-kerberos to get ADFS token" color="bg-green-50 border-green-200" expanded={exp.ka4} onToggle={() => toggle('ka4')}
+              desc="Authenticate to ADFS using Kerberos SPNEGO and obtain an OAuth2 token."
+              detail={<div>
+                <p className="mb-2 text-xs font-bold">Install dependencies:</p>
+                <div className="font-mono text-xs bg-white bg-opacity-50 p-3 rounded mb-3 overflow-x-auto">
+                  <p>pip install requests requests-kerberos</p>
+                </div>
+                <p className="mb-2 text-xs font-bold">Python script — adfs_token.py:</p>
+                <div className="font-mono text-xs bg-white bg-opacity-50 p-3 rounded mb-3 overflow-x-auto leading-relaxed">
+                  <p>import requests</p>
+                  <p>from requests_kerberos import HTTPKerberosAuth, REQUIRED</p>
+                  <p></p>
+                  <p className="text-green-700"># ── Configuration ──</p>
+                  <p>ADFS_HOST    = "adfs.company.com"</p>
+                  <p>CLIENT_ID    = "your-app-client-id"</p>
+                  <p>RESOURCE     = "https://api.company.com"  # or the relying party identifier</p>
+                  <p></p>
+                  <p className="text-green-700"># ── Step 1: Create Kerberos auth handler ──</p>
+                  <p className="text-green-700"># This uses the TGT from the credential cache (from kinit)</p>
+                  <p>krb_auth = HTTPKerberosAuth(</p>
+                  <p>    mutual_authentication=REQUIRED,  # server must prove identity too</p>
+                  <p>    sanitize_mutual_error_response=True,</p>
+                  <p>)</p>
+                  <p></p>
+                  <p className="text-green-700"># ── Step 2: Hit the ADFS WS-Trust/Kerberos endpoint ──</p>
+                  <p className="text-green-700"># ADFS exposes a Windows Transport endpoint that accepts Kerberos</p>
+                  <p>adfs_mex = f"https://{"{"}ADFS_HOST{"}"}/adfs/services/trust/13/windowstransport"</p>
+                  <p></p>
+                  <p className="text-green-700"># Build the WS-Trust RST (Request Security Token) SOAP envelope</p>
+                  <p>rst_body = f"""&lt;?xml version="1.0" encoding="utf-8"?&gt;</p>
+                  <p>&lt;s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"</p>
+                  <p>  xmlns:a="http://www.w3.org/2005/08/addressing"</p>
+                  <p>  xmlns:trust="http://docs.oasis-open.org/ws-sx/ws-trust/200512"&gt;</p>
+                  <p>  &lt;s:Header&gt;</p>
+                  <p>    &lt;a:Action&gt;http://docs.oasis-open.org/ws-sx/ws-trust/200512/RST/Issue&lt;/a:Action&gt;</p>
+                  <p>    &lt;a:To&gt;https://{"{"}ADFS_HOST{"}"}/adfs/services/trust/13/windowstransport&lt;/a:To&gt;</p>
+                  <p>  &lt;/s:Header&gt;</p>
+                  <p>  &lt;s:Body&gt;</p>
+                  <p>    &lt;trust:RequestSecurityToken&gt;</p>
+                  <p>      &lt;trust:AppliesTo&gt;</p>
+                  <p>        &lt;a:EndpointReference&gt;</p>
+                  <p>          &lt;a:Address&gt;{"{"}RESOURCE{"}"}&lt;/a:Address&gt;</p>
+                  <p>        &lt;/a:EndpointReference&gt;</p>
+                  <p>      &lt;/trust:AppliesTo&gt;</p>
+                  <p>      &lt;trust:RequestType&gt;http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue&lt;/trust:RequestType&gt;</p>
+                  <p>    &lt;/trust:RequestSecurityToken&gt;</p>
+                  <p>  &lt;/s:Body&gt;</p>
+                  <p>&lt;/s:Envelope&gt;"""</p>
+                  <p></p>
+                  <p className="text-green-700"># Send with Kerberos auth — SPNEGO negotiation happens automatically</p>
+                  <p>resp = requests.post(adfs_mex, data=rst_body, auth=krb_auth,</p>
+                  <p>    headers={"{"}"Content-Type": "application/soap+xml; charset=utf-8"{"}"})</p>
+                  <p></p>
+                  <p>print(f"Status: {"{"}resp.status_code{"}"}")</p>
+                  <p>print(resp.text[:500])  # SAML assertion in the response</p>
+                </div>
+                <p className="mb-2 text-xs font-bold">Alternative — OAuth2 token via ADFS /token endpoint (simpler):</p>
+                <div className="font-mono text-xs bg-white bg-opacity-50 p-3 rounded overflow-x-auto leading-relaxed">
+                  <p>import requests</p>
+                  <p>from requests_kerberos import HTTPKerberosAuth, REQUIRED</p>
+                  <p></p>
+                  <p className="text-green-700"># ADFS OAuth2 authorize endpoint with Kerberos</p>
+                  <p>session = requests.Session()</p>
+                  <p>session.auth = HTTPKerberosAuth(mutual_authentication=REQUIRED)</p>
+                  <p></p>
+                  <p className="text-green-700"># Step 1: Hit the authorize endpoint — ADFS will Negotiate</p>
+                  <p>auth_url = (</p>
+                  <p>    f"https://{"{"}ADFS_HOST{"}"}/adfs/oauth2/authorize"</p>
+                  <p>    f"?response_type=code"</p>
+                  <p>    f"&client_id={"{"}CLIENT_ID{"}"}"</p>
+                  <p>    f"&resource={"{"}RESOURCE{"}"}"</p>
+                  <p>    f"&redirect_uri=https://localhost/callback"</p>
+                  <p>)</p>
+                  <p>resp = session.get(auth_url, allow_redirects=False)</p>
+                  <p></p>
+                  <p className="text-green-700"># Step 2: ADFS authenticates via Kerberos, redirects with auth code</p>
+                  <p>auth_code = resp.headers["Location"].split("code=")[1].split("&")[0]</p>
+                  <p></p>
+                  <p className="text-green-700"># Step 3: Exchange auth code for tokens</p>
+                  <p>token_resp = requests.post(</p>
+                  <p>    f"https://{"{"}ADFS_HOST{"}"}/adfs/oauth2/token",</p>
+                  <p>    data={"{"}</p>
+                  <p>        "grant_type": "authorization_code",</p>
+                  <p>        "code": auth_code,</p>
+                  <p>        "client_id": CLIENT_ID,</p>
+                  <p>        "redirect_uri": "https://localhost/callback",</p>
+                  <p>    {"}"},</p>
+                  <p>)</p>
+                  <p>tokens = token_resp.json()</p>
+                  <p>print("Access Token:", tokens["access_token"][:50], "...")</p>
+                  <p>print("ID Token:", tokens.get("id_token", "N/A")[:50], "...")</p>
+                </div>
+              </div>} />
+
+            <StepCard num="5" title="What happens under the hood" color="bg-teal-50 border-teal-200" expanded={exp.ka5} onToggle={() => toggle('ka5')}
+              desc="The full chain: keytab → ccache → SPNEGO → ADFS → OAuth2 token."
+              detail={<div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-start gap-2"><span className="bg-blue-200 text-blue-800 font-bold px-2 py-0.5 rounded-full text-xs flex-shrink-0">A</span><p><strong>kinit</strong> reads the key from the keytab, sends AS-REQ → gets TGT → writes to ccache file.</p></div>
+                  <div className="flex items-start gap-2"><span className="bg-purple-200 text-purple-800 font-bold px-2 py-0.5 rounded-full text-xs flex-shrink-0">B</span><p><strong>requests-kerberos</strong> sends HTTP request to ADFS. ADFS returns <code className="bg-white px-1 rounded">401 + WWW-Authenticate: Negotiate</code>.</p></div>
+                  <div className="flex items-start gap-2"><span className="bg-indigo-200 text-indigo-800 font-bold px-2 py-0.5 rounded-full text-xs flex-shrink-0">C</span><p><strong>GSSAPI</strong> (called by requests-kerberos) reads the TGT from ccache → sends TGS-REQ to KDC for SPN <code className="bg-white px-1 rounded">HTTP/adfs.company.com</code> → gets Service Ticket.</p></div>
+                  <div className="flex items-start gap-2"><span className="bg-green-200 text-green-800 font-bold px-2 py-0.5 rounded-full text-xs flex-shrink-0">D</span><p>GSSAPI wraps the Service Ticket in a <strong>SPNEGO token</strong> and adds it to the <code className="bg-white px-1 rounded">Authorization: Negotiate</code> header.</p></div>
+                  <div className="flex items-start gap-2"><span className="bg-teal-200 text-teal-800 font-bold px-2 py-0.5 rounded-full text-xs flex-shrink-0">E</span><p><strong>ADFS</strong> decrypts the Service Ticket → validates identity from PAC → issues the SAML assertion or OAuth2 authorization code.</p></div>
+                  <div className="flex items-start gap-2"><span className="bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-xs flex-shrink-0">F</span><p>Your script exchanges the auth code for <strong>access_token</strong> and <strong>id_token</strong> — standard OAuth2 flow from here.</p></div>
+                </div>
+              </div>} />
+          </div>
+
+          <InfoBox title="Environment Variable for Custom Cache Path" emoji="📁">
+            <p className="mb-1">If your script runs under a different user, point to the correct cache:</p>
+            <div className="font-mono bg-white bg-opacity-50 p-2 rounded text-xs mt-2">
+              <p>export KRB5CCNAME=/tmp/krb5cc_svc-myapp</p>
+              <p>kinit -kt /etc/krb5/svc-myapp.keytab svc-myapp@COMPANY.COM</p>
+              <p>python adfs_token.py   # requests-kerberos reads KRB5CCNAME automatically</p>
+            </div>
+          </InfoBox>
         </div>
       );
       case 5: return (
