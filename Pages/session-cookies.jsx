@@ -191,6 +191,229 @@ const SigningDiagram = () => {
   );
 };
 
+/* ── SVG: Signing Pipeline Diagram ── */
+const SigningPipelineDiagram = () => {
+  const W = 820, H = 400;
+  const steps = [
+    { x: 80,  label: "Python Dict", sub: "(session data)", c: "#3B82F6", bg: "#EFF6FF", icon: "{ }" },
+    { x: 240, label: "JSON String", sub: "(serialize)", c: "#8B5CF6", bg: "#F5F3FF", icon: "\" \"" },
+    { x: 400, label: "Compress", sub: "(zlib, optional)", c: "#EC4899", bg: "#FDF2F8", icon: "zip" },
+    { x: 560, label: "Base64url", sub: "(URL-safe)", c: "#10B981", bg: "#ECFDF5", icon: "b64" },
+    { x: 720, label: "Sign (HMAC)", sub: "(SHA-512)", c: "#EF4444", bg: "#FEF2F2", icon: "sig" },
+  ];
+  return (
+    <div className="overflow-x-auto my-5">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[750px]" style={{ maxHeight: 420 }}>
+        <defs>
+          <marker id="sp-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#64748B" /></marker>
+          <filter id="sp-s" x="-4%" y="-4%" width="108%" height="108%"><feDropShadow dx="1" dy="2" stdDeviation="3" floodOpacity="0.1" /></filter>
+        </defs>
+        {/* Title */}
+        <text x={W / 2} y={24} textAnchor="middle" fontSize={13} fontWeight="bold" fill="#1E293B">Signing Pipeline: Python dict → Cookie Value</text>
+        {/* Step boxes */}
+        {steps.map((s, i) => (
+          <g key={i}>
+            <rect x={s.x - 60} y={45} width={120} height={70} rx={12} fill={s.bg} stroke={s.c} strokeWidth={2} filter="url(#sp-s)" />
+            <text x={s.x} y={68} textAnchor="middle" fontSize={11} fontWeight="bold" fill={s.c}>{s.label}</text>
+            <text x={s.x} y={84} textAnchor="middle" fontSize={9} fill={s.c} opacity={0.7}>{s.sub}</text>
+            <rect x={s.x - 16} y={92} width={32} height={16} rx={4} fill={s.c} opacity={0.15} />
+            <text x={s.x} y={104} textAnchor="middle" fontSize={8} fontWeight="bold" fill={s.c} fontFamily="monospace">{s.icon}</text>
+            {/* Arrow to next */}
+            {i < steps.length - 1 && (
+              <line x1={s.x + 62} y1={80} x2={steps[i + 1].x - 62} y2={80} stroke="#94A3B8" strokeWidth={2} markerEnd="url(#sp-arr)" />
+            )}
+          </g>
+        ))}
+        {/* Data flow labels below arrows */}
+        {[
+          { x: 160, t: "json.dumps()" },
+          { x: 320, t: "zlib.compress()" },
+          { x: 480, t: "b64encode()" },
+          { x: 640, t: "HMAC(key, data)" },
+        ].map((l, i) => (
+          <text key={i} x={l.x} y={72} textAnchor="middle" fontSize={7.5} fill="#94A3B8" fontStyle="italic">{l.t}</text>
+        ))}
+        {/* SECRET_KEY input to signing step */}
+        <rect x={660} y={140} width={120} height={40} rx={8} fill="#FEF2F2" stroke="#EF4444" strokeWidth={2} filter="url(#sp-s)" />
+        <text x={720} y={158} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#DC2626">SECRET_KEY</text>
+        <text x={720} y={172} textAnchor="middle" fontSize={8} fill="#EF4444" fontStyle="italic">(server-only)</text>
+        <line x1={720} y1={140} x2={720} y2={118} stroke="#EF4444" strokeWidth={2} strokeDasharray="5,3" />
+        {/* Output */}
+        <rect x={160} y={200} width={500} height={65} rx={12} fill="#0F172A" filter="url(#sp-s)" />
+        <text x={410} y={220} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#94A3B8">Final Cookie Value</text>
+        <text x={215} y={245} textAnchor="start" fontSize={11} fill="#60A5FA" fontFamily="monospace">eyJ1c2VyX2lkIjo0Mn0</text>
+        <text x={395} y={245} textAnchor="middle" fontSize={11} fill="#475569" fontFamily="monospace">.</text>
+        <text x={415} y={245} textAnchor="start" fontSize={11} fill="#FBBF24" fontFamily="monospace">ZxN5QQ</text>
+        <text x={467} y={245} textAnchor="middle" fontSize={11} fill="#475569" fontFamily="monospace">.</text>
+        <text x={480} y={245} textAnchor="start" fontSize={11} fill="#F87171" fontFamily="monospace">r3Kj8xLm_qN7vZ2b</text>
+        {/* Labels under output parts */}
+        <text x={300} y={258} textAnchor="middle" fontSize={8} fill="#60A5FA">payload (base64)</text>
+        <text x={430} y={258} textAnchor="middle" fontSize={8} fill="#FBBF24">timestamp</text>
+        <text x={555} y={258} textAnchor="middle" fontSize={8} fill="#F87171">HMAC signature</text>
+        {/* Arrow from pipeline to output */}
+        <line x1={410} y1={118} x2={410} y2={195} stroke="#64748B" strokeWidth={2} markerEnd="url(#sp-arr)" strokeDasharray="6,3" />
+        {/* Properties panel */}
+        <rect x={80} y={290} width={660} height={95} rx={12} fill="#F8FAFC" stroke="#E2E8F0" strokeWidth={1.5} />
+        <text x={100} y={312} fontSize={11} fontWeight="bold" fill="#334155">Properties of HMAC Signing</text>
+        {[
+          { x: 100, y: 334, icon: "✅", t: "Deterministic — same input + same key = same output" },
+          { x: 100, y: 352, icon: "🔒", t: "One-way — cannot reverse signature to recover SECRET_KEY" },
+          { x: 100, y: 370, icon: "🎯", t: "Sensitive — change 1 bit of payload → completely different signature" },
+          { x: 460, y: 334, icon: "🔑", t: "Key-dependent — no key = no valid signature" },
+          { x: 460, y: 352, icon: "📐", t: "Fixed-size — output is always 20 bytes (truncated)" },
+          { x: 460, y: 370, icon: "⚡", t: "Fast — HMAC-SHA512 is very performant" },
+        ].map((p, i) => (
+          <g key={i}>
+            <text x={p.x} y={p.y} fontSize={9} fill="#1E293B">{p.icon} {p.t}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
+/* ── SVG: Verification Flow Diagram ── */
+const VerificationFlowDiagram = () => {
+  const W = 780, H = 520;
+  const mkr = { "#3B82F6": "vf-blue", "#EF4444": "vf-red", "#10B981": "vf-green", "#64748B": "vf-gray", "#F59E0B": "vf-amber" };
+  return (
+    <div className="overflow-x-auto my-5">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[700px]" style={{ maxHeight: 540 }}>
+        <defs>
+          {Object.entries(mkr).map(([c, id]) => (
+            <marker key={id} id={id} markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill={c} /></marker>
+          ))}
+          <filter id="vfs" x="-4%" y="-4%" width="108%" height="108%"><feDropShadow dx="1" dy="2" stdDeviation="2" floodOpacity="0.1" /></filter>
+        </defs>
+        {/* Title */}
+        <text x={W / 2} y={22} textAnchor="middle" fontSize={13} fontWeight="bold" fill="#1E293B">Cookie Verification Flow (on each request)</text>
+        {/* Incoming cookie */}
+        <rect x={180} y={35} width={420} height={40} rx={10} fill="#0F172A" filter="url(#vfs)" />
+        <text x={390} y={52} textAnchor="middle" fontSize={9} fill="#94A3B8" fontWeight="bold">Incoming Cookie</text>
+        <text x={260} y={67} textAnchor="start" fontSize={9} fill="#60A5FA" fontFamily="monospace">payload</text>
+        <text x={315} y={67} textAnchor="middle" fontSize={9} fill="#475569">.</text>
+        <text x={335} y={67} textAnchor="start" fontSize={9} fill="#FBBF24" fontFamily="monospace">timestamp</text>
+        <text x={405} y={67} textAnchor="middle" fontSize={9} fill="#475569">.</text>
+        <text x={425} y={67} textAnchor="start" fontSize={9} fill="#F87171" fontFamily="monospace">signature</text>
+        {/* Arrow down to split */}
+        <line x1={390} y1={78} x2={390} y2={100} stroke="#64748B" strokeWidth={2} markerEnd="url(#vf-gray)" />
+        {/* Split step */}
+        <rect x={310} y={105} width={160} height={32} rx={8} fill="#F8FAFC" stroke="#E2E8F0" strokeWidth={2} filter="url(#vfs)" />
+        <text x={390} y={126} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#334155">Split on "."</text>
+        {/* Three branches */}
+        <line x1={330} y1={140} x2={140} y2={175} stroke="#3B82F6" strokeWidth={2} markerEnd="url(#vf-blue)" />
+        <line x1={390} y1={140} x2={390} y2={175} stroke="#F59E0B" strokeWidth={2} markerEnd="url(#vf-amber)" />
+        <line x1={450} y1={140} x2={640} y2={175} stroke="#EF4444" strokeWidth={2} markerEnd="url(#vf-red)" />
+        {/* Three boxes */}
+        <rect x={60} y={180} width={160} height={36} rx={8} fill="#EFF6FF" stroke="#3B82F6" strokeWidth={2} filter="url(#vfs)" />
+        <text x={140} y={203} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#1E40AF">Payload</text>
+        <rect x={310} y={180} width={160} height={36} rx={8} fill="#FFFBEB" stroke="#F59E0B" strokeWidth={2} filter="url(#vfs)" />
+        <text x={390} y={203} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#92400E">Timestamp</text>
+        <rect x={560} y={180} width={160} height={36} rx={8} fill="#FEF2F2" stroke="#EF4444" strokeWidth={2} filter="url(#vfs)" />
+        <text x={640} y={203} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#DC2626">Received Sig</text>
+        {/* Step 1: Check timestamp */}
+        <line x1={390} y1={220} x2={390} y2={255} stroke="#F59E0B" strokeWidth={2} markerEnd="url(#vf-amber)" />
+        <rect x={270} y={260} width={240} height={40} rx={10} fill="#FFFBEB" stroke="#F59E0B" strokeWidth={2} filter="url(#vfs)" />
+        <text x={390} y={278} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#92400E">1. Check Expiry</text>
+        <text x={390} y={293} textAnchor="middle" fontSize={8} fill="#A16207">age = now - (ts + EPOCH) &gt; max_age?</text>
+        {/* Expired branch */}
+        <line x1={515} y1={280} x2={610} y2={280} stroke="#EF4444" strokeWidth={2} markerEnd="url(#vf-red)" />
+        <rect x={615} y={265} width={100} height={30} rx={8} fill="#FEE2E2" stroke="#EF4444" strokeWidth={2} />
+        <text x={665} y={284} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#DC2626">401 Expired</text>
+        {/* Step 2: Re-derive key */}
+        <line x1={390} y1={304} x2={390} y2={325} stroke="#64748B" strokeWidth={2} markerEnd="url(#vf-gray)" />
+        <rect x={250} y={330} width={280} height={40} rx={10} fill="#F5F3FF" stroke="#8B5CF6" strokeWidth={2} filter="url(#vfs)" />
+        <text x={390} y={348} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#6D28D9">2. Re-compute HMAC</text>
+        <text x={390} y={363} textAnchor="middle" fontSize={8} fill="#7C3AED">expected = HMAC(derived_key, payload.ts)</text>
+        {/* SECRET_KEY input */}
+        <rect x={60} y={335} width={130} height={30} rx={8} fill="#FEF2F2" stroke="#EF4444" strokeWidth={2} filter="url(#vfs)" />
+        <text x={125} y={355} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#DC2626">SECRET_KEY</text>
+        <line x1={195} y1={350} x2={245} y2={350} stroke="#EF4444" strokeWidth={2} markerEnd="url(#vf-red)" strokeDasharray="5,3" />
+        {/* Payload input */}
+        <line x1={140} y1={220} x2={140} y2={340} stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5,3" opacity={0.5} />
+        <line x1={140} y1={340} x2={245} y2={350} stroke="#3B82F6" strokeWidth={1.5} strokeDasharray="5,3" opacity={0.5} />
+        {/* Step 3: Compare */}
+        <line x1={390} y1={374} x2={390} y2={400} stroke="#64748B" strokeWidth={2} markerEnd="url(#vf-gray)" />
+        <rect x={280} y={405} width={220} height={40} rx={10} fill="#FEF9C3" stroke="#EAB308" strokeWidth={2} filter="url(#vfs)" />
+        <text x={390} y={423} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#854D0E">3. Compare Signatures</text>
+        <text x={390} y={438} textAnchor="middle" fontSize={8} fill="#A16207">expected == received?</text>
+        {/* Received sig input */}
+        <line x1={640} y1={220} x2={640} y2={420} stroke="#EF4444" strokeWidth={1.5} strokeDasharray="5,3" opacity={0.5} />
+        <line x1={640} y1={420} x2={505} y2={425} stroke="#EF4444" strokeWidth={1.5} strokeDasharray="5,3" opacity={0.5} />
+        {/* Tampered branch */}
+        <line x1={505} y1={425} x2={600} y2={465} stroke="#EF4444" strokeWidth={2} markerEnd="url(#vf-red)" />
+        <rect x={605} y={452} width={120} height={30} rx={8} fill="#FEE2E2" stroke="#EF4444" strokeWidth={2} />
+        <text x={665} y={471} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#DC2626">403 Tampered</text>
+        {/* Valid branch */}
+        <line x1={280} y1={425} x2={180} y2={465} stroke="#10B981" strokeWidth={2} markerEnd="url(#vf-green)" />
+        <rect x={50} y={452} width={180} height={50} rx={10} fill="#ECFDF5" stroke="#10B981" strokeWidth={2} filter="url(#vfs)" />
+        <text x={140} y={473} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#059669">Valid Session</text>
+        <text x={140} y={490} textAnchor="middle" fontSize={8} fill="#047857">b64decode → JSON → session dict</text>
+        {/* Labels on branches */}
+        <text x={220} y={460} fontSize={9} fontWeight="bold" fill="#10B981">Match!</text>
+        <text x={560} y={453} fontSize={9} fontWeight="bold" fill="#EF4444">Mismatch!</text>
+        <text x={565} y={275} fontSize={9} fontWeight="bold" fill="#EF4444">Yes</text>
+        <text x={388} y={316} fontSize={9} fill="#64748B">No (still valid)</text>
+      </svg>
+    </div>
+  );
+};
+
+/* ── SVG: HMAC Key Derivation Diagram ── */
+const HmacDerivationDiagram = () => {
+  const W = 780, H = 300;
+  return (
+    <div className="overflow-x-auto my-5">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[700px]" style={{ maxHeight: 320 }}>
+        <defs>
+          <marker id="hd-arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#64748B" /></marker>
+          <marker id="hd-red" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#EF4444" /></marker>
+          <filter id="hds" x="-4%" y="-4%" width="108%" height="108%"><feDropShadow dx="1" dy="2" stdDeviation="2" floodOpacity="0.1" /></filter>
+        </defs>
+        <text x={W / 2} y={22} textAnchor="middle" fontSize={13} fontWeight="bold" fill="#1E293B">HMAC Key Derivation & Signing</text>
+        {/* SECRET_KEY */}
+        <rect x={60} y={40} width={160} height={50} rx={10} fill="#FEF2F2" stroke="#EF4444" strokeWidth={2} filter="url(#hds)" />
+        <text x={140} y={62} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#DC2626">SECRET_KEY</text>
+        <text x={140} y={80} textAnchor="middle" fontSize={8} fill="#EF4444" fontFamily="monospace">"super-secret-..."</text>
+        {/* Salt */}
+        <rect x={60} y={110} width={160} height={40} rx={8} fill="#FAF5FF" stroke="#8B5CF6" strokeWidth={1.5} filter="url(#hds)" />
+        <text x={140} y={128} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#6D28D9">Salt</text>
+        <text x={140} y={142} textAnchor="middle" fontSize={8} fill="#8B5CF6" fontFamily="monospace">"cookie-session"+"signer"</text>
+        {/* Key derivation box */}
+        <rect x={290} y={60} width={200} height={65} rx={12} fill="#F5F3FF" stroke="#8B5CF6" strokeWidth={2} filter="url(#hds)" />
+        <text x={390} y={82} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#6D28D9">Key Derivation</text>
+        <text x={390} y={98} textAnchor="middle" fontSize={9} fill="#7C3AED">HMAC-SHA512(</text>
+        <text x={390} y={112} textAnchor="middle" fontSize={9} fill="#7C3AED">  key=SECRET_KEY, msg=salt)</text>
+        {/* Arrows in */}
+        <line x1={225} y1={65} x2={285} y2={80} stroke="#EF4444" strokeWidth={2} markerEnd="url(#hd-red)" />
+        <line x1={225} y1={130} x2={285} y2={100} stroke="#8B5CF6" strokeWidth={2} markerEnd="url(#hd-arr)" />
+        {/* Derived key output */}
+        <line x1={495} y1={92} x2={540} y2={92} stroke="#64748B" strokeWidth={2} markerEnd="url(#hd-arr)" />
+        <rect x={545} y={70} width={170} height={45} rx={10} fill="#FDF4FF" stroke="#A855F7" strokeWidth={2} filter="url(#hds)" />
+        <text x={630} y={90} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#7E22CE">Derived Key</text>
+        <text x={630} y={105} textAnchor="middle" fontSize={8} fill="#A855F7" fontFamily="monospace">64 bytes (SHA-512 output)</text>
+        {/* Payload.timestamp */}
+        <rect x={290} y={170} width={200} height={40} rx={8} fill="#EFF6FF" stroke="#3B82F6" strokeWidth={1.5} filter="url(#hds)" />
+        <text x={390} y={190} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#1E40AF">payload.timestamp</text>
+        <text x={390} y={204} textAnchor="middle" fontSize={8} fill="#3B82F6" fontFamily="monospace">eyJ1c2Vy....ZxN5QQ</text>
+        {/* Final HMAC */}
+        <rect x={290} y={235} width={200} height={50} rx={12} fill="#ECFDF5" stroke="#10B981" strokeWidth={2} filter="url(#hds)" />
+        <text x={390} y={256} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#059669">HMAC-SHA512</text>
+        <text x={390} y={272} textAnchor="middle" fontSize={9} fill="#047857">key=derived, msg=data</text>
+        {/* Arrows */}
+        <line x1={630} y1={120} x2={630} y2={248} stroke="#A855F7" strokeWidth={2} strokeDasharray="5,3" />
+        <line x1={630} y1={248} x2={495} y2={258} stroke="#A855F7" strokeWidth={2} markerEnd="url(#hd-arr)" />
+        <line x1={390} y1={214} x2={390} y2={230} stroke="#3B82F6" strokeWidth={2} markerEnd="url(#hd-arr)" />
+        {/* Output */}
+        <line x1={495} y1={260} x2={545} y2={260} stroke="#10B981" strokeWidth={2} markerEnd="url(#hd-arr)" />
+        <rect x={550} y={237} width={180} height={50} rx={10} fill="#0F172A" filter="url(#hds)" />
+        <text x={640} y={258} textAnchor="middle" fontSize={10} fontWeight="bold" fill="#F87171">Signature</text>
+        <text x={640} y={275} textAnchor="middle" fontSize={8} fill="#94A3B8" fontFamily="monospace">truncate(20 bytes) → b64</text>
+      </svg>
+    </div>
+  );
+};
+
 export default function SessionCookiesGuide() {
   const [active, setActive] = useState("overview");
   const [expanded, setExpanded] = useState(null);
@@ -309,7 +532,7 @@ export default function SessionCookiesGuide() {
       </p>
 
       <Analogy>
-        Imagine a hotel with amnesia. Every time you walk up to the front desk, they have no idea who you are. So they give you a <strong>wristband with a number</strong> (cookie). When you come back, you show the wristband, and they look up your number in their <strong>guest book</strong> (session store) to find your room, preferences, and room service orders.
+        Imagine a hotel. Every time you walk up to the front desk, they have no idea who you are. So they give you a <strong>wristband with a number</strong> (cookie). When you come back, you show the wristband, and they look up your number in their <strong>guest book</strong> (session store) to find your room, preferences, and room service orders.
       </Analogy>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -599,25 +822,7 @@ Set-Cookie: session=; Max-Age=0; Path=/; HttpOnly; Secure`}
       {/* ── Pipeline overview ── */}
       <SectionTitle icon="🏭">The Signing Pipeline</SectionTitle>
 
-      <DiagramBox title="Step-by-Step: Python dict → Signed Cookie Value">
-{`  STEP 1          STEP 2          STEP 3           STEP 4           STEP 5
-  ─────────       ─────────       ─────────        ─────────        ─────────
-  Python dict  →  JSON string  →  Compress      →  Base64url     →  Append
-  (session)       (serialize)     (zlib, if        (URL-safe        HMAC
-                                  smaller)         encoding)        Signature
-
-  ┌───────────┐  ┌─────────────┐  ┌────────────┐  ┌─────────────┐  ┌──────────────────────┐
-  │{           │  │'{"user_id": │  │ b'x\\x9c...'│  │ eyJ1c2VyX2  │  │ eyJ1c2VyX2lkIjo0Mn0 │
-  │ "user_id": │→ │  42,        │→ │ (compressed │→ │ lkIjo0Miwi  │→ │ .ZxN5QQ              │
-  │  42,       │  │  "role":    │  │  bytes)     │  │ cm9sZSI6Im  │  │ .r3Kj8xLm_SIGNATURE  │
-  │ "role":    │  │  "admin"}'  │  │ or raw JSON │  │ FkbWluIn0   │  │                      │
-  │  "admin"   │  │             │  │ if smaller  │  │             │  │ payload.timestamp.sig │
-  │}           │  │             │  │             │  │             │  │                      │
-  └───────────┘  └─────────────┘  └────────────┘  └─────────────┘  └──────────────────────┘
-
-                                                                    Final cookie value:
-                                                                    payload.timestamp.HMAC`}
-      </DiagramBox>
+      <SigningPipelineDiagram />
 
       {/* ── Step 1: Serialization ── */}
       <ExpandCard id="sign-1" icon="1️⃣" title="Step 1: Serialize to JSON" subtitle="Python dict → JSON string" color="#3b82f6">
@@ -751,36 +956,7 @@ sig_b64 = base64.urlsafe_b64encode(signature[:20]).rstrip(b"=")
 # ═══════════════════════════════════════════════════`}
         </CodeBlock>
 
-        <DiagramBox title="HMAC Internals (simplified)">
-{`                    ┌─────────────────────────┐
-                    │      SECRET_KEY          │
-                    │ "super-secret-random..." │
-                    └───────────┬──────────────┘
-                                │
-                    ┌───────────▼──────────────┐
-                    │   Key Derivation          │
-                    │   HMAC-SHA512(            │
-                    │     key=SECRET_KEY,       │
-                    │     msg=salt+"signer"     │
-                    │   )                       │
-                    └───────────┬──────────────┘
-                                │
-                    derived_key ▼
-                    ┌───────────────────────────┐
-   payload.ts ────► │   HMAC-SHA512(             │ ────► signature
-                    │     key=derived_key,       │       (truncated to
-                    │     msg="payload.timestamp"│        20 bytes,
-                    │   )                        │        base64url'd)
-                    └───────────────────────────┘
-
-   HMAC = Hash(  (key XOR opad)  ||  Hash( (key XOR ipad) || message )  )
-
-   Properties:
-   • Deterministic: same input + same key = same output every time
-   • One-way: you CANNOT reverse the signature to get SECRET_KEY
-   • Sensitive: change 1 bit of payload → completely different signature
-   • Requires key: without SECRET_KEY, you cannot forge a valid signature`}
-        </DiagramBox>
+        <HmacDerivationDiagram />
       </ExpandCard>
 
       {/* ── Final assembly ── */}
@@ -822,43 +998,7 @@ sig_b64 = base64.urlsafe_b64encode(signature[:20]).rstrip(b"=")
         When the browser sends the cookie back, the server reverses the process and re-computes the HMAC to check for tampering.
       </p>
 
-      <DiagramBox title="Verification Sequence">
-{`  Incoming cookie: eyJ1c2VyX2lkIjo0Mn0.ZxN5QQ.r3Kj8xLm_SIGNATURE
-                   │                     │       │
-                   ▼                     ▼       ▼
-              Split on "."           ──────────────
-              into 3 parts           received_sig
-                   │
-        ┌──────────┼──────────┐
-        ▼          ▼          ▼
-    payload    timestamp   received_sig
-        │          │
-        │          │  1. Check timestamp
-        │          ├─────────────────────────────────────────┐
-        │          │  ts = decode_b64(timestamp)             │
-        │          │  age = now - (ts + EPOCH)               │
-        │          │  if age > max_age: REJECT (expired) ──► │ 401
-        │          │                                         │
-        │          │  2. Re-derive the signing key           │
-        ├──────────┤  derived_key = HMAC(SECRET_KEY, salt)   │
-        │          │                                         │
-        │          │  3. Re-compute HMAC                     │
-        │          │  expected_sig = HMAC(derived_key,       │
-        │          │                      payload.timestamp) │
-        │          │                                         │
-        │          │  4. Compare signatures                  │
-        │          │  if expected_sig != received_sig:       │
-        │          │      REJECT (tampered) ────────────────►│ 403
-        │          │                                         │
-        │          │  5. Signatures match!                   │
-        │          │  Decode payload: b64decode → JSON parse │
-        │          │  Return session dict to the application │
-        │          │                                         │
-        └──────────┘                            ┌────────────┘
-                                                │
-                                          session_data =
-                                          {"user_id": 42, "role": "admin"}`}
-      </DiagramBox>
+      <VerificationFlowDiagram />
 
       {/* ── Tamper demo ── */}
       <SectionTitle icon="🔨">What Happens If Someone Tampers?</SectionTitle>

@@ -3,6 +3,7 @@ import OAuthGuide from '@pages/oauth2-oidc-guide.jsx';
 import KerberosGuide from '@pages/kerberos.jsx';
 import ADGuide from '@pages/active-directory.jsx';
 import SessionCookiesGuide from '@pages/session-cookies.jsx';
+import ADACLGuide from '@pages/ad-acl.jsx';
 
 const pagesConfig = [
   {
@@ -54,6 +55,16 @@ const pagesConfig = [
     color: '#f59e0b',
     category: 'Concepts',
     component: SessionCookiesGuide,
+  },
+  {
+    id: 'ad-acl',
+    path: '/ad-acl',
+    title: 'AD Access Control',
+    subtitle: 'Security Descriptors, DACLs, Inheritance & ACE Evaluation',
+    icon: '\u{1F6E1}',
+    color: '#dc2626',
+    category: 'Directory Services',
+    component: ADACLGuide,
   },
 ];
 
