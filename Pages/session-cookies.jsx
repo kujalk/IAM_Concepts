@@ -290,6 +290,7 @@ export default function SessionCookiesGuide() {
     { id: "overview", title: "Overview", icon: "🍪", color: "#f59e0b" },
     { id: "lifecycle", title: "Request Lifecycle", icon: "🔄", color: "#3b82f6" },
     { id: "persistence", title: "Browser Storage", icon: "💾", color: "#8b5cf6" },
+    { id: "signing", title: "How Signing Works", icon: "🔏", color: "#0ea5e9" },
     { id: "flask", title: "Flask Sessions", icon: "🧪", color: "#10b981" },
     { id: "fastapi", title: "FastAPI Sessions", icon: "⚡", color: "#ec4899" },
     { id: "security", title: "Security", icon: "🛡️", color: "#ef4444" },
@@ -581,7 +582,378 @@ Set-Cookie: session=; Max-Age=0; Path=/; HttpOnly; Secure`}
   );
 
   /* ══════════════════════════════════════════════════════
-     SECTION 4 — FLASK SESSIONS
+     SECTION 4 — HOW SIGNING WORKS (DEEP DIVE)
+     ══════════════════════════════════════════════════════ */
+
+  const renderSigning = () => (
+    <div>
+      <SectionTitle icon="🔏">How a Session Cookie Value is Derived</SectionTitle>
+      <p className="text-sm text-slate-600 leading-relaxed mb-4">
+        You see a cookie like <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs font-mono">eyJ1c2VyX2lkIjo0Mn0.ZxN5QQ.r3Kj8x...</code> — but how does the server turn <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs font-mono">{`{"user_id": 42}`}</code> into that string? This section walks through every step of the derivation, byte by byte.
+      </p>
+
+      <Analogy>
+        Signing a cookie is like <strong>sealing a letter with a wax stamp</strong>. Everyone can read the letter (the data is just base64, not encrypted). But if anyone changes a single word, the wax seal won't match when the server checks it — and the letter is rejected. Only someone with the original signet ring (SECRET_KEY) can produce a valid seal.
+      </Analogy>
+
+      {/* ── Pipeline overview ── */}
+      <SectionTitle icon="🏭">The Signing Pipeline</SectionTitle>
+
+      <DiagramBox title="Step-by-Step: Python dict → Signed Cookie Value">
+{`  STEP 1          STEP 2          STEP 3           STEP 4           STEP 5
+  ─────────       ─────────       ─────────        ─────────        ─────────
+  Python dict  →  JSON string  →  Compress      →  Base64url     →  Append
+  (session)       (serialize)     (zlib, if        (URL-safe        HMAC
+                                  smaller)         encoding)        Signature
+
+  ┌───────────┐  ┌─────────────┐  ┌────────────┐  ┌─────────────┐  ┌──────────────────────┐
+  │{           │  │'{"user_id": │  │ b'x\\x9c...'│  │ eyJ1c2VyX2  │  │ eyJ1c2VyX2lkIjo0Mn0 │
+  │ "user_id": │→ │  42,        │→ │ (compressed │→ │ lkIjo0Miwi  │→ │ .ZxN5QQ              │
+  │  42,       │  │  "role":    │  │  bytes)     │  │ cm9sZSI6Im  │  │ .r3Kj8xLm_SIGNATURE  │
+  │ "role":    │  │  "admin"}'  │  │ or raw JSON │  │ FkbWluIn0   │  │                      │
+  │  "admin"   │  │             │  │ if smaller  │  │             │  │ payload.timestamp.sig │
+  │}           │  │             │  │             │  │             │  │                      │
+  └───────────┘  └─────────────┘  └────────────┘  └─────────────┘  └──────────────────────┘
+
+                                                                    Final cookie value:
+                                                                    payload.timestamp.HMAC`}
+      </DiagramBox>
+
+      {/* ── Step 1: Serialization ── */}
+      <ExpandCard id="sign-1" icon="1️⃣" title="Step 1: Serialize to JSON" subtitle="Python dict → JSON string" color="#3b82f6">
+        <p className="mb-3">The session dictionary is converted to a JSON string using Python's <code className="bg-white px-1 rounded text-xs">json.dumps()</code>.</p>
+        <CodeBlock title="Serialization">
+{`import json
+
+session_data = {"user_id": 42, "role": "admin"}
+
+# Step 1: Python dict → JSON string
+json_string = json.dumps(session_data, separators=(",", ":"))
+# Result: '{"user_id":42,"role":"admin"}'
+#
+# Note: separators=(",", ":") removes whitespace for compact output
+# This is what itsdangerous does internally`}
+        </CodeBlock>
+        <InfoBox title="Why JSON?">
+          JSON is language-agnostic, human-readable, and compact. Flask's <code className="bg-white px-1 rounded text-xs">itsdangerous</code> uses a custom JSON serializer internally called <code className="bg-white px-1 rounded text-xs">TaggedJSONSerializer</code> that can handle Python-specific types like <code className="bg-white px-1 rounded text-xs">datetime</code>, <code className="bg-white px-1 rounded text-xs">tuple</code>, <code className="bg-white px-1 rounded text-xs">bytes</code>, and <code className="bg-white px-1 rounded text-xs">Markup</code> by tagging them.
+        </InfoBox>
+      </ExpandCard>
+
+      {/* ── Step 2: Compress ── */}
+      <ExpandCard id="sign-2" icon="2️⃣" title="Step 2: Compress with zlib (conditional)" subtitle="Only if compressed output is smaller than raw" color="#8b5cf6">
+        <p className="mb-3"><code className="bg-white px-1 rounded text-xs">itsdangerous</code> tries to compress the JSON bytes with <strong>zlib</strong>. If the compressed version is shorter, it uses it and prepends a <code className="bg-white px-1 rounded text-xs">.</code> marker. If not, it keeps the raw JSON.</p>
+        <CodeBlock title="Compression (conditional)">
+{`import zlib
+
+json_bytes = b'{"user_id":42,"role":"admin"}'
+
+# Try zlib compression
+compressed = zlib.compress(json_bytes)
+
+if len(compressed) < len(json_bytes):
+    # Use compressed version, prepend "." as marker
+    payload_bytes = b"." + compressed
+    # When decoding, itsdangerous sees the leading "."
+    # and knows to decompress with zlib
+else:
+    # Raw JSON is smaller — skip compression
+    payload_bytes = json_bytes
+    # For short sessions like ours, compression often
+    # makes it BIGGER (zlib header overhead > savings)
+
+# For our small example: raw (28 bytes) wins over compressed (~36 bytes)
+# For large sessions with many keys: compression wins`}
+        </CodeBlock>
+      </ExpandCard>
+
+      {/* ── Step 3: Base64url ── */}
+      <ExpandCard id="sign-3" icon="3️⃣" title="Step 3: Base64url Encode" subtitle="Binary bytes → URL-safe ASCII string" color="#10b981">
+        <p className="mb-3">The payload bytes are encoded with <strong>base64url</strong> — a variant of base64 that's safe for URLs and cookies (no <code className="bg-white px-1 rounded text-xs">+</code>, <code className="bg-white px-1 rounded text-xs">/</code>, or <code className="bg-white px-1 rounded text-xs">=</code> padding).</p>
+        <CodeBlock title="Base64url encoding">
+{`import base64
+
+json_bytes = b'{"user_id":42,"role":"admin"}'
+
+# Standard base64:
+#   eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0=
+#                                              ^ padding
+
+# Base64url (itsdangerous style):
+#   eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0
+#   (no padding, + → -, / → _)
+
+payload_b64 = base64.urlsafe_b64encode(json_bytes).rstrip(b"=")
+# Result: b'eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0'`}
+        </CodeBlock>
+        <InfoBox title="This Is Why You Can Decode It">
+          <p>Base64 is <strong>encoding, not encryption</strong>. Anyone can reverse it:</p>
+          <div className="font-mono bg-white bg-opacity-50 p-2 rounded text-xs mt-2">
+            <p>$ echo 'eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0' | base64 -d</p>
+            <p>{`{"user_id":42,"role":"admin"}`}</p>
+          </div>
+          <p className="mt-2">The session data is <strong>readable by anyone</strong>. Signing only prevents <strong>tampering</strong>, not reading. If you need to hide the data, use encryption (Fernet) instead.</p>
+        </InfoBox>
+      </ExpandCard>
+
+      {/* ── Step 4: Timestamp ── */}
+      <ExpandCard id="sign-4" icon="4️⃣" title="Step 4: Generate & Append Timestamp" subtitle="Unix epoch → base64url, appended after '.'" color="#f59e0b">
+        <p className="mb-3"><code className="bg-white px-1 rounded text-xs">URLSafeTimedSerializer</code> appends a <strong>timestamp</strong> to the payload. This enables expiry checking — the server can reject cookies older than <code className="bg-white px-1 rounded text-xs">max_age</code> seconds.</p>
+        <CodeBlock title="Timestamp derivation">
+{`import time, struct, base64
+
+# Current Unix timestamp (seconds since 1970-01-01)
+now = int(time.time())  # e.g., 1740873600 (2025-03-02 00:00:00 UTC)
+
+# itsdangerous subtracts an epoch (2011-01-01) to keep it compact
+EPOCH = 1293840000  # Jan 1, 2011
+timestamp = now - EPOCH  # e.g., 447033600
+
+# Encode as base62-ish or base64url of packed int
+ts_bytes = struct.pack(">I", timestamp)  # 4 bytes, big-endian unsigned int
+ts_b64 = base64.urlsafe_b64encode(ts_bytes).rstrip(b"=")
+# Result: b'ZxN5QQ'  (compact timestamp)
+
+# Append to payload with "." separator:
+# eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0.ZxN5QQ
+#  ^^^^^^^^^^^^ payload ^^^^^^^^^^^^^^^^^^^^  ^^^^^^
+#                                            timestamp`}
+        </CodeBlock>
+      </ExpandCard>
+
+      {/* ── Step 5: HMAC Signature ── */}
+      <ExpandCard id="sign-5" icon="5️⃣" title="Step 5: Compute HMAC Signature" subtitle="The core security step — signs payload+timestamp with SECRET_KEY" color="#ef4444">
+        <p className="mb-3">This is the critical step. An <strong>HMAC (Hash-based Message Authentication Code)</strong> is computed over the payload and timestamp using your <code className="bg-white px-1 rounded text-xs">SECRET_KEY</code>. This produces a fixed-size signature that proves the data hasn't been tampered with.</p>
+        <CodeBlock title="HMAC-SHA512 signature">
+{`import hmac, hashlib, base64
+
+SECRET_KEY = b"super-secret-random-key-change-me"
+
+# The data to sign: payload + "." + timestamp
+sign_input = b"eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0.ZxN5QQ"
+
+# Derive a signing key (itsdangerous uses a derived key, not raw SECRET_KEY)
+# It does: HMAC(SECRET_KEY, b"cookie-session" + b"signer") → derived key
+salt = b"cookie-session"
+key_derivation = hmac.new(SECRET_KEY, salt + b"signer", hashlib.sha512).digest()
+
+# Compute HMAC-SHA512 over the payload.timestamp string
+signature = hmac.new(key_derivation, sign_input, hashlib.sha512).digest()
+
+# Truncate to first 20 bytes (160 bits) and base64url encode
+sig_b64 = base64.urlsafe_b64encode(signature[:20]).rstrip(b"=")
+# Result: b'r3Kj8xLm_qN7vZ2bF8wK1pYTc3M'
+
+# ═══════════════════════════════════════════════════
+# FINAL COOKIE VALUE:
+# eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0.ZxN5QQ.r3Kj8xLm_qN7vZ2bF8wK1pYTc3M
+# ^^^^^^^^^^^^^ payload ^^^^^^^^^^^^^^^^^^^^^.^^^^^.^^^^^^^^^^^^^ signature ^^^^^^^^
+#                                            timestamp
+# ═══════════════════════════════════════════════════`}
+        </CodeBlock>
+
+        <DiagramBox title="HMAC Internals (simplified)">
+{`                    ┌─────────────────────────┐
+                    │      SECRET_KEY          │
+                    │ "super-secret-random..." │
+                    └───────────┬──────────────┘
+                                │
+                    ┌───────────▼──────────────┐
+                    │   Key Derivation          │
+                    │   HMAC-SHA512(            │
+                    │     key=SECRET_KEY,       │
+                    │     msg=salt+"signer"     │
+                    │   )                       │
+                    └───────────┬──────────────┘
+                                │
+                    derived_key ▼
+                    ┌───────────────────────────┐
+   payload.ts ────► │   HMAC-SHA512(             │ ────► signature
+                    │     key=derived_key,       │       (truncated to
+                    │     msg="payload.timestamp"│        20 bytes,
+                    │   )                        │        base64url'd)
+                    └───────────────────────────┘
+
+   HMAC = Hash(  (key XOR opad)  ||  Hash( (key XOR ipad) || message )  )
+
+   Properties:
+   • Deterministic: same input + same key = same output every time
+   • One-way: you CANNOT reverse the signature to get SECRET_KEY
+   • Sensitive: change 1 bit of payload → completely different signature
+   • Requires key: without SECRET_KEY, you cannot forge a valid signature`}
+        </DiagramBox>
+      </ExpandCard>
+
+      {/* ── Final assembly ── */}
+      <SectionTitle icon="🧩">Final Cookie Assembly</SectionTitle>
+
+      <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-5 mb-4">
+        <p className="text-xs font-bold text-slate-700 mb-3">Cookie header sent by server:</p>
+        <div className="bg-slate-900 rounded-lg p-4 font-mono text-xs overflow-x-auto mb-4">
+          <span className="text-slate-500">Set-Cookie: session=</span>
+          <span className="text-blue-400">eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0</span>
+          <span className="text-slate-400">.</span>
+          <span className="text-amber-400">ZxN5QQ</span>
+          <span className="text-slate-400">.</span>
+          <span className="text-red-400">r3Kj8xLm_qN7vZ2bF8wK1pYTc3M</span>
+          <span className="text-slate-500">; HttpOnly; Secure; SameSite=Lax</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="font-bold text-blue-700 text-xs mb-1">Part 1: Payload</div>
+            <div className="font-mono text-xs text-blue-600 break-all">eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0</div>
+            <p className="text-xs text-blue-500 mt-2">Base64url(JSON session data). <strong>Anyone can decode this.</strong></p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <div className="font-bold text-amber-700 text-xs mb-1">Part 2: Timestamp</div>
+            <div className="font-mono text-xs text-amber-600 break-all">ZxN5QQ</div>
+            <p className="text-xs text-amber-500 mt-2">Base64url(unix_time - epoch). Server checks if it's within <code className="bg-white px-1 rounded">max_age</code>.</p>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="font-bold text-red-700 text-xs mb-1">Part 3: Signature</div>
+            <div className="font-mono text-xs text-red-600 break-all">r3Kj8xLm_qN7vZ2bF8wK1pYTc3M</div>
+            <p className="text-xs text-red-500 mt-2">HMAC-SHA512(payload.timestamp, derived_key). <strong>Tamper-proof seal.</strong></p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Verification ── */}
+      <SectionTitle icon="✅">How Verification Works (On Each Request)</SectionTitle>
+      <p className="text-sm text-slate-600 leading-relaxed mb-3">
+        When the browser sends the cookie back, the server reverses the process and re-computes the HMAC to check for tampering.
+      </p>
+
+      <DiagramBox title="Verification Sequence">
+{`  Incoming cookie: eyJ1c2VyX2lkIjo0Mn0.ZxN5QQ.r3Kj8xLm_SIGNATURE
+                   │                     │       │
+                   ▼                     ▼       ▼
+              Split on "."           ──────────────
+              into 3 parts           received_sig
+                   │
+        ┌──────────┼──────────┐
+        ▼          ▼          ▼
+    payload    timestamp   received_sig
+        │          │
+        │          │  1. Check timestamp
+        │          ├─────────────────────────────────────────┐
+        │          │  ts = decode_b64(timestamp)             │
+        │          │  age = now - (ts + EPOCH)               │
+        │          │  if age > max_age: REJECT (expired) ──► │ 401
+        │          │                                         │
+        │          │  2. Re-derive the signing key           │
+        ├──────────┤  derived_key = HMAC(SECRET_KEY, salt)   │
+        │          │                                         │
+        │          │  3. Re-compute HMAC                     │
+        │          │  expected_sig = HMAC(derived_key,       │
+        │          │                      payload.timestamp) │
+        │          │                                         │
+        │          │  4. Compare signatures                  │
+        │          │  if expected_sig != received_sig:       │
+        │          │      REJECT (tampered) ────────────────►│ 403
+        │          │                                         │
+        │          │  5. Signatures match!                   │
+        │          │  Decode payload: b64decode → JSON parse │
+        │          │  Return session dict to the application │
+        │          │                                         │
+        └──────────┘                            ┌────────────┘
+                                                │
+                                          session_data =
+                                          {"user_id": 42, "role": "admin"}`}
+      </DiagramBox>
+
+      {/* ── Tamper demo ── */}
+      <SectionTitle icon="🔨">What Happens If Someone Tampers?</SectionTitle>
+
+      <ExpandCard id="sign-tamper" icon="😈" title="Attacker tries to change role from 'user' to 'admin'" subtitle="Modifying payload → signature mismatch → rejected" color="#ef4444">
+        <div className="space-y-3 text-xs">
+          <div className="bg-green-50 rounded-lg p-3">
+            <p className="font-bold text-green-700 mb-1">Original cookie (legitimate):</p>
+            <p className="font-mono break-all">eyJ1c2VyX2lkIjo0Miwicm9sZSI6InVzZXIifQ.ZxN5QQ.<strong>VALID_SIG</strong></p>
+            <p className="mt-1 text-green-600">Payload decodes to: {`{"user_id":42,"role":"user"}`}</p>
+          </div>
+          <div className="bg-red-50 rounded-lg p-3">
+            <p className="font-bold text-red-700 mb-1">Attacker modifies payload to change "user" → "admin":</p>
+            <p className="font-mono break-all">eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0.ZxN5QQ.<strong>VALID_SIG</strong></p>
+            <p className="mt-1 text-red-600">New payload decodes to: {`{"user_id":42,"role":"admin"}`}</p>
+            <p className="mt-1 text-red-600">But the signature was computed over the ORIGINAL payload!</p>
+          </div>
+          <div className="bg-slate-50 rounded-lg p-3">
+            <p className="font-bold text-slate-700 mb-1">Server verification:</p>
+            <p className="font-mono">expected = HMAC(key, <strong>new_payload</strong>.timestamp) → <span className="text-red-600">DIFFERENT_SIG</span></p>
+            <p className="font-mono">received = <span className="text-green-600">VALID_SIG</span> (computed over old payload)</p>
+            <p className="font-mono mt-1 text-red-600 font-bold">DIFFERENT_SIG ≠ VALID_SIG → REJECTED! 🚫</p>
+          </div>
+          <div className="bg-amber-50 rounded-lg p-3">
+            <p className="font-bold text-amber-700 mb-1">Can the attacker re-compute the signature?</p>
+            <p className="text-amber-600">No! The signature requires the <strong>SECRET_KEY</strong>, which only lives on the server. Without it, the attacker would need to brute-force HMAC-SHA512 — computationally infeasible.</p>
+          </div>
+        </div>
+      </ExpandCard>
+
+      {/* ── End-to-end Python ── */}
+      <SectionTitle icon="🐍">Complete Working Example</SectionTitle>
+      <p className="text-sm text-slate-600 leading-relaxed mb-3">
+        Here's how you can reproduce the entire signing pipeline yourself in Python:
+      </p>
+
+      <CodeBlock title="Full signing & verification in pure Python">
+{`from itsdangerous import URLSafeTimedSerializer
+import base64, json
+
+SECRET_KEY = "my-super-secret-key"
+s = URLSafeTimedSerializer(SECRET_KEY)
+
+# ═══ SIGNING (server creates the cookie) ═══
+
+session_data = {"user_id": 42, "role": "admin"}
+
+# This does: JSON serialize → compress → base64url → timestamp → HMAC sign
+cookie_value = s.dumps(session_data)
+print("Cookie:", cookie_value)
+# → 'eyJ1c2VyX2lkIjo0Miwicm9sZSI6ImFkbWluIn0.ZxN5QQ.r3Kj8xLm...'
+
+# ═══ DECODING (anyone can do this — it's not secret) ═══
+
+parts = cookie_value.split(".")
+payload_b64 = parts[0]
+# Add back padding for standard base64
+padding = 4 - len(payload_b64) % 4
+payload_json = base64.urlsafe_b64decode(payload_b64 + "=" * padding)
+print("Decoded:", payload_json)
+# → b'{"user_id":42,"role":"admin"}'
+
+# ═══ VERIFICATION (only server can do this — needs SECRET_KEY) ═══
+
+try:
+    data = s.loads(cookie_value, max_age=3600)  # 1 hour max
+    print("Valid session:", data)
+    # → {'user_id': 42, 'role': 'admin'}
+except Exception as e:
+    print("Invalid/expired:", e)
+
+# ═══ TAMPER TEST ═══
+
+tampered = cookie_value.replace("admin", "XXXXX")
+try:
+    s.loads(tampered, max_age=3600)
+except Exception as e:
+    print("Tampered cookie caught:", e)
+    # → BadSignature: Signature b'...' does not match`}
+      </CodeBlock>
+
+      <Warning title="SECRET_KEY is Everything">
+        <p className="mb-1">If an attacker gets your <code className="bg-white px-1 rounded text-xs">SECRET_KEY</code>, they can forge any session cookie for any user. Treat it like a database password:</p>
+        <ul className="list-disc ml-4 space-y-1 mt-2">
+          <li>Generate with <code className="bg-white px-1 rounded text-xs">python -c "import secrets; print(secrets.token_hex(32))"</code></li>
+          <li>Store in environment variables, never in source code</li>
+          <li>Rotate periodically (this invalidates all active sessions)</li>
+          <li>Use different keys for dev / staging / production</li>
+        </ul>
+      </Warning>
+    </div>
+  );
+
+  /* ══════════════════════════════════════════════════════
+     SECTION 5 — FLASK SESSIONS
      ══════════════════════════════════════════════════════ */
 
   const renderFlask = () => (
@@ -1122,6 +1494,7 @@ def login():
       case "overview": return renderOverview();
       case "lifecycle": return renderLifecycle();
       case "persistence": return renderPersistence();
+      case "signing": return renderSigning();
       case "flask": return renderFlask();
       case "fastapi": return renderFastAPI();
       case "security": return renderSecurity();
