@@ -4,6 +4,7 @@ import KerberosGuide from '@pages/kerberos.jsx';
 import ADGuide from '@pages/active-directory.jsx';
 import SessionCookiesGuide from '@pages/session-cookies.jsx';
 import ADACLGuide from '@pages/ad-acl.jsx';
+import KafkaGuide from '@pages/kafka.jsx';
 
 const pagesConfig = [
   {
@@ -65,6 +66,16 @@ const pagesConfig = [
     color: '#dc2626',
     category: 'Directory Services',
     component: ADACLGuide,
+  },
+  {
+    id: 'kafka',
+    path: '/kafka',
+    title: 'Apache Kafka',
+    subtitle: 'Distributed Event Streaming — Topics, Brokers, Replication & ksqlDB',
+    icon: '◈',
+    color: '#f97316',
+    category: 'Messaging & Streaming',
+    component: KafkaGuide,
   },
 ];
 
