@@ -5,6 +5,7 @@ import ADGuide from '@pages/active-directory.jsx';
 import SessionCookiesGuide from '@pages/session-cookies.jsx';
 import ADACLGuide from '@pages/ad-acl.jsx';
 import KafkaGuide from '@pages/kafka.jsx';
+import TLSFlowGuide from '@pages/ldaps_https.jsx';
 
 const pagesConfig = [
   {
@@ -66,6 +67,16 @@ const pagesConfig = [
     color: '#dc2626',
     category: 'Directory Services',
     component: ADACLGuide,
+  },
+  {
+    id: 'tls-flow',
+    path: '/tls-flow',
+    title: 'LDAPS & HTTPS TLS Flow',
+    subtitle: 'TLS Handshake Sequences — LDAPS vs HTTPS vs TLS 1.2 vs 1.3',
+    icon: '🔐',
+    color: '#38bdf8',
+    category: 'Protocols',
+    component: TLSFlowGuide,
   },
   {
     id: 'kafka',
