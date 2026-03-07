@@ -7,6 +7,7 @@ import ADACLGuide from '@pages/ad-acl.jsx';
 import KafkaGuide from '@pages/kafka.jsx';
 import TLSFlowGuide from '@pages/ldaps_https.jsx';
 import GCPSecurityGuide from '@pages/gcp-security.jsx';
+import NTLMGuide from '@pages/ntlm.jsx';
 
 const pagesConfig = [
   {
@@ -88,6 +89,16 @@ const pagesConfig = [
     color: '#f97316',
     category: 'Messaging & Streaming',
     component: KafkaGuide,
+  },
+  {
+    id: 'ntlm',
+    path: '/ntlm',
+    title: 'NTLM Authentication',
+    subtitle: 'Challenge-Response, LDAP Binds, SPNEGO, Cross-Domain & Security',
+    icon: '🔐',
+    color: '#6366f1',
+    category: 'Protocols',
+    component: NTLMGuide,
   },
   {
     id: 'gcp-security',
