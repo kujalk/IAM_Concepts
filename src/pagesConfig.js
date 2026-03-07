@@ -6,6 +6,7 @@ import SessionCookiesGuide from '@pages/session-cookies.jsx';
 import ADACLGuide from '@pages/ad-acl.jsx';
 import KafkaGuide from '@pages/kafka.jsx';
 import TLSFlowGuide from '@pages/ldaps_https.jsx';
+import GCPSecurityGuide from '@pages/gcp-security.jsx';
 
 const pagesConfig = [
   {
@@ -87,6 +88,16 @@ const pagesConfig = [
     color: '#f97316',
     category: 'Messaging & Streaming',
     component: KafkaGuide,
+  },
+  {
+    id: 'gcp-security',
+    path: '/gcp-security',
+    title: 'Google Cloud Security',
+    subtitle: 'IAM Roles, Policy Binding, Cloud Identity, Workload & Workforce Federation',
+    icon: '☁',
+    color: '#4285f4',
+    category: 'Cloud Platforms',
+    component: GCPSecurityGuide,
   },
 ];
 
