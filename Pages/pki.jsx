@@ -77,7 +77,7 @@ const CodeBlock = ({ children, color = C.accent }) => (
 ════════════════════════════════════════ */
 
 const AW = 110, AG = 155, SH = 54, PH = 42, TM = 90, SP = 28;
-const MAX_SELF_LABEL = 42; // truncate self-loop labels in SVG; full text is in hover note
+const MAX_SELF_LABEL = 42;
 
 function SeqDiagram({ title, actorList, steps }) {
   const [hovered, setHovered] = useState(null);
@@ -91,115 +91,140 @@ function SeqDiagram({ title, actorList, steps }) {
   const totalH = y + 36;
   const ax = (i) => SP + AW / 2 + i * AG;
 
+  // Find the currently hovered step data for the info panel
+  const hoveredStep = hovered !== null ? steps[hovered] : null;
+
   return (
-    <div style={{ overflowX: "auto", marginBottom: 28, borderRadius: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
-      <svg width={totalW} height={totalH} viewBox={`0 0 ${totalW} ${totalH}`} style={{ display: "block", minWidth: totalW }}>
-        <defs>
-          <marker id="pkiArrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <path d="M0,0 L8,3 L0,6 Z" fill={C.textMuted} />
-          </marker>
-          <marker id="pkiArrowHot" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-            <path d="M0,0 L8,3 L0,6 Z" fill={C.warn} />
-          </marker>
-          <filter id="pkiGlow">
-            <feGaussianBlur stdDeviation="1.5" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
+    <div style={{ marginBottom: 28 }}>
+      {/* Info panel — shows full note for hovered step */}
+      <div style={{
+        minHeight: 68,
+        background: hoveredStep?.note ? `${hoveredStep.important ? C.warn : C.accent3}0e` : C.panelAlt,
+        border: `1px solid ${hoveredStep?.note ? (hoveredStep.important ? C.warn : C.accent3) + "40" : C.panelBorder}`,
+        borderRadius: "8px 8px 0 0",
+        padding: "10px 16px",
+        transition: "all 0.15s",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+      }}>
+        {hoveredStep?.note ? (
+          <>
+            <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{hoveredStep.important ? "⚠" : "ℹ"}</span>
+            <div>
+              <div style={{ color: C.textMuted, fontSize: 10.5, fontFamily: "'JetBrains Mono', monospace", marginBottom: 3 }}>
+                {hoveredStep.label}
+              </div>
+              <div style={{ color: C.text, fontSize: 13, lineHeight: 1.65, fontFamily: "'JetBrains Mono', monospace" }}>
+                {hoveredStep.note}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ color: C.textMuted, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", alignSelf: "center" }}>
+            ↓ Hover over any arrow or loop to see a detailed explanation
+          </div>
+        )}
+      </div>
 
-        {/* Light background */}
-        <rect width={totalW} height={totalH} fill={C.panelAlt} rx={8} />
+      {/* SVG diagram */}
+      <div style={{ overflowX: "auto", borderRadius: "0 0 8px 8px", boxShadow: "0 2px 6px rgba(0,0,0,0.08)" }}>
+        <svg width={totalW} height={totalH} viewBox={`0 0 ${totalW} ${totalH}`} style={{ display: "block", minWidth: totalW }}>
+          <defs>
+            <marker id="pkiArrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6 Z" fill={C.textMuted} />
+            </marker>
+            <marker id="pkiArrowHot" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6 Z" fill={C.warn} />
+            </marker>
+            <marker id="pkiArrowHov" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6 Z" fill={C.accent3} />
+            </marker>
+            <filter id="pkiGlow">
+              <feGaussianBlur stdDeviation="1.5" result="b" />
+              <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
 
-        <text x={totalW / 2} y={30} textAnchor="middle" fill={C.text} fontSize={15} fontWeight={700} fontFamily="'JetBrains Mono', monospace">
-          {title}
-        </text>
+          <rect width={totalW} height={totalH} fill={C.panelAlt} />
 
-        {actorList.map((a, i) => {
-          const cx = ax(i);
-          return (
-            <g key={a.id}>
-              <rect x={cx - AW / 2} y={46} width={AW} height={36} rx={6} fill={C.panel} stroke={a.color} strokeWidth={1.8} />
-              {a.label.split("\n").map((line, li) => (
-                <text key={li} x={cx} y={59 + li * 13} textAnchor="middle" fill={a.color} fontSize={9.5} fontWeight={700} fontFamily="'JetBrains Mono', monospace">{line}</text>
-              ))}
-              <line x1={cx} y1={82} x2={cx} y2={totalH - 10} stroke={C.line} strokeWidth={1} strokeDasharray="4,4" />
-            </g>
-          );
-        })}
+          <text x={totalW / 2} y={30} textAnchor="middle" fill={C.text} fontSize={15} fontWeight={700} fontFamily="'JetBrains Mono', monospace">
+            {title}
+          </text>
 
-        {steps.map((step, idx) => {
-          const pos = rows[idx];
-          if (!pos) return null;
-
-          if (step.phase) {
+          {actorList.map((a, i) => {
+            const cx = ax(i);
             return (
-              <g key={idx}>
-                <rect x={6} y={pos.y} width={totalW - 12} height={PH - 6} rx={4} fill={step.color + "18"} stroke={step.color + "50"} strokeWidth={1} />
-                <text x={18} y={pos.y + PH / 2 - 1} fill={step.color} fontSize={10.5} fontWeight={700} fontFamily="'JetBrains Mono', monospace" dominantBaseline="middle">▸ {step.phase}</text>
+              <g key={a.id}>
+                <rect x={cx - AW / 2} y={46} width={AW} height={36} rx={6} fill={C.panel} stroke={a.color} strokeWidth={1.8} />
+                {a.label.split("\n").map((line, li) => (
+                  <text key={li} x={cx} y={59 + li * 13} textAnchor="middle" fill={a.color} fontSize={9.5} fontWeight={700} fontFamily="'JetBrains Mono', monospace">{line}</text>
+                ))}
+                <line x1={cx} y1={82} x2={cx} y2={totalH - 10} stroke={C.line} strokeWidth={1} strokeDasharray="4,4" />
               </g>
             );
-          }
+          })}
 
-          const fromX = ax(step.from);
-          const toX = step.self ? ax(step.from) : ax(step.to);
-          const midY = pos.y + SH / 2;
-          const isHov = hovered === idx;
-          const sc = step.important ? C.warn : C.textDim;
+          {steps.map((step, idx) => {
+            const pos = rows[idx];
+            if (!pos) return null;
 
-          if (step.self) {
-            const lw = 48, lh = 18;
-            // Flip loop to the left for right-side actors to avoid overflow
-            const flipLeft = fromX > totalW * 0.55;
-            const truncLabel = step.label.length > MAX_SELF_LABEL
-              ? step.label.slice(0, MAX_SELF_LABEL) + "…"
-              : step.label;
-
-            if (flipLeft) {
+            if (step.phase) {
               return (
-                <g key={idx} onMouseEnter={() => setHovered(idx)} onMouseLeave={() => setHovered(null)} style={{ cursor: step.note ? "pointer" : "default" }}>
-                  {isHov && step.note && (
-                    <>
-                      <rect x={Math.max(4, fromX - lw - step.note.length * 5 - 16)} y={midY - 30} width={Math.min(step.note.length * 5 + 16, fromX - lw - 8)} height={22} rx={3} fill={C.panel} stroke={sc} strokeWidth={0.8} />
-                      <text x={fromX - lw - 12} y={midY - 16} textAnchor="end" fill={C.text} fontSize={8.5} fontFamily="'JetBrains Mono', monospace">{step.note.length > 65 ? step.note.slice(0, 65) + "…" : step.note}</text>
-                    </>
-                  )}
-                  <path d={`M${fromX},${midY - lh / 2} h-${lw} v${lh} h${lw}`} fill="none" stroke={sc} strokeWidth={1.2} strokeDasharray={step.dashed ? "4,3" : "none"} markerEnd={step.important ? "url(#pkiArrowHot)" : "url(#pkiArrow)"} />
-                  <text x={fromX - lw - 6} y={midY + 4} textAnchor="end" fill={sc} fontSize={8.5} fontFamily="'JetBrains Mono', monospace" fontWeight={step.important ? 700 : 400}>{truncLabel}</text>
+                <g key={idx}>
+                  <rect x={6} y={pos.y} width={totalW - 12} height={PH - 6} rx={4} fill={step.color + "18"} stroke={step.color + "50"} strokeWidth={1} />
+                  <text x={18} y={pos.y + PH / 2 - 1} fill={step.color} fontSize={10.5} fontWeight={700} fontFamily="'JetBrains Mono', monospace" dominantBaseline="middle">▸ {step.phase}</text>
                 </g>
               );
             }
 
+            const fromX = ax(step.from);
+            const toX = step.self ? ax(step.from) : ax(step.to);
+            const midY = pos.y + SH / 2;
+            const isHov = hovered === idx;
+            // Colour: hovered = blue highlight, important = amber, default = grey
+            const sc = isHov ? C.accent3 : step.important ? C.warn : C.textDim;
+            const markerEnd = isHov ? "url(#pkiArrowHov)" : step.important ? "url(#pkiArrowHot)" : "url(#pkiArrow)";
+
+            if (step.self) {
+              const lw = 48, lh = 18;
+              const flipLeft = fromX > totalW * 0.55;
+              const truncLabel = step.label.length > MAX_SELF_LABEL
+                ? step.label.slice(0, MAX_SELF_LABEL) + "…"
+                : step.label;
+
+              if (flipLeft) {
+                return (
+                  <g key={idx} onMouseEnter={() => setHovered(idx)} onMouseLeave={() => setHovered(null)} style={{ cursor: step.note ? "pointer" : "default" }}>
+                    {isHov && <rect x={fromX - lw - 2} y={midY - lh / 2 - 2} width={lw + 4} height={lh + 4} rx={3} fill={C.accent3 + "18"} />}
+                    <path d={`M${fromX},${midY - lh / 2} h-${lw} v${lh} h${lw}`} fill="none" stroke={sc} strokeWidth={isHov ? 2 : 1.2} strokeDasharray={step.dashed ? "4,3" : "none"} markerEnd={markerEnd} />
+                    <text x={fromX - lw - 6} y={midY + 4} textAnchor="end" fill={sc} fontSize={8.5} fontFamily="'JetBrains Mono', monospace" fontWeight={step.important || isHov ? 700 : 400}>{truncLabel}</text>
+                  </g>
+                );
+              }
+
+              return (
+                <g key={idx} onMouseEnter={() => setHovered(idx)} onMouseLeave={() => setHovered(null)} style={{ cursor: step.note ? "pointer" : "default" }}>
+                  {isHov && <rect x={fromX - 2} y={midY - lh / 2 - 2} width={lw + 4} height={lh + 4} rx={3} fill={C.accent3 + "18"} />}
+                  <path d={`M${fromX},${midY - lh / 2} h${lw} v${lh} h-${lw}`} fill="none" stroke={sc} strokeWidth={isHov ? 2 : 1.2} strokeDasharray={step.dashed ? "4,3" : "none"} markerEnd={markerEnd} />
+                  <text x={fromX + lw + 6} y={midY + 4} fill={sc} fontSize={8.5} fontFamily="'JetBrains Mono', monospace" fontWeight={step.important || isHov ? 700 : 400}>{truncLabel}</text>
+                </g>
+              );
+            }
+
+            const dir = toX > fromX ? 1 : -1;
+            const x1 = fromX + dir * 6, x2 = toX - dir * 6;
+            const truncArrow = step.label && step.label.length > 52 ? step.label.slice(0, 52) + "…" : step.label;
             return (
               <g key={idx} onMouseEnter={() => setHovered(idx)} onMouseLeave={() => setHovered(null)} style={{ cursor: step.note ? "pointer" : "default" }}>
-                {isHov && step.note && (
-                  <>
-                    <rect x={fromX + lw + 8} y={midY - 30} width={Math.min(step.note.length * 5 + 16, totalW - fromX - lw - 16)} height={22} rx={3} fill={C.panel} stroke={sc} strokeWidth={0.8} />
-                    <text x={fromX + lw + 14} y={midY - 16} fill={C.text} fontSize={8.5} fontFamily="'JetBrains Mono', monospace">{step.note.length > 65 ? step.note.slice(0, 65) + "…" : step.note}</text>
-                  </>
-                )}
-                <path d={`M${fromX},${midY - lh / 2} h${lw} v${lh} h-${lw}`} fill="none" stroke={sc} strokeWidth={1.2} strokeDasharray={step.dashed ? "4,3" : "none"} markerEnd={step.important ? "url(#pkiArrowHot)" : "url(#pkiArrow)"} />
-                <text x={fromX + lw + 6} y={midY + 4} fill={sc} fontSize={8.5} fontFamily="'JetBrains Mono', monospace" fontWeight={step.important ? 700 : 400}>{truncLabel}</text>
+                {isHov && <rect x={Math.min(x1, x2) - 2} y={midY - 14} width={Math.abs(x2 - x1) + 4} height={20} rx={3} fill={C.accent3 + "15"} />}
+                <line x1={x1} y1={midY} x2={x2} y2={midY} stroke={sc} strokeWidth={isHov || step.important ? 2 : 1.2} strokeDasharray={step.dashed ? "5,3" : "none"} markerEnd={markerEnd} filter={step.important ? "url(#pkiGlow)" : undefined} />
+                <text x={(x1 + x2) / 2} y={midY - 6} textAnchor="middle" fill={sc} fontSize={8.5} fontFamily="'JetBrains Mono', monospace" fontWeight={step.important || isHov ? 700 : 400}>{truncArrow}</text>
               </g>
             );
-          }
-
-          const dir = toX > fromX ? 1 : -1;
-          const x1 = fromX + dir * 6, x2 = toX - dir * 6;
-          const truncArrow = step.label && step.label.length > 55 ? step.label.slice(0, 55) + "…" : step.label;
-          return (
-            <g key={idx} onMouseEnter={() => setHovered(idx)} onMouseLeave={() => setHovered(null)} style={{ cursor: step.note ? "pointer" : "default" }}>
-              {isHov && step.note && (
-                <>
-                  <rect x={Math.min(x1, x2)} y={midY - 32} width={Math.min(step.note.length * 5 + 16, Math.abs(x2 - x1))} height={22} rx={3} fill={C.panel} fillOpacity={0.96} stroke={sc} strokeWidth={0.6} />
-                  <text x={Math.min(x1, x2) + 8} y={midY - 19} fill={C.text} fontSize={8.5} fontFamily="'JetBrains Mono', monospace">{step.note.length > 75 ? step.note.slice(0, 75) + "…" : step.note}</text>
-                </>
-              )}
-              <line x1={x1} y1={midY} x2={x2} y2={midY} stroke={sc} strokeWidth={step.important ? 2 : 1.2} strokeDasharray={step.dashed ? "5,3" : "none"} markerEnd={step.important ? "url(#pkiArrowHot)" : "url(#pkiArrow)"} filter={step.important ? "url(#pkiGlow)" : undefined} />
-              <text x={(x1 + x2) / 2} y={midY - 7} textAnchor="middle" fill={sc} fontSize={8.5} fontFamily="'JetBrains Mono', monospace" fontWeight={step.important ? 700 : 400}>{truncArrow}</text>
-            </g>
-          );
-        })}
-      </svg>
+          })}
+        </svg>
+      </div>
     </div>
   );
 }
