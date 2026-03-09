@@ -1,4 +1,5 @@
 import JWTGuide from '@pages/jwt-deep-dive.jsx';
+import SpinnakerGuide from '@pages/spinnaker.jsx';
 import OAuthGuide from '@pages/oauth2-oidc-guide.jsx';
 import KerberosGuide from '@pages/kerberos.jsx';
 import ADGuide from '@pages/active-directory.jsx';
@@ -88,7 +89,7 @@ const pagesConfig = [
     subtitle: 'Distributed Event Streaming — Topics, Brokers, Replication & ksqlDB',
     icon: '◈',
     color: '#f97316',
-    category: 'Messaging & Streaming',
+    category: 'Miscellaneous',
     component: KafkaGuide,
   },
   {
@@ -110,6 +111,16 @@ const pagesConfig = [
     color: '#10b981',
     category: 'Protocols',
     component: PKIGuide,
+  },
+  {
+    id: 'spinnaker',
+    path: '/spinnaker',
+    title: 'Spinnaker',
+    subtitle: 'Multi-Cloud CD — Architecture, Kubernetes & AWS Integration',
+    icon: '🔱',
+    color: '#7c3aed',
+    category: 'Miscellaneous',
+    component: SpinnakerGuide,
   },
   {
     id: 'gcp-security',
