@@ -8,6 +8,7 @@ import KafkaGuide from '@pages/kafka.jsx';
 import TLSFlowGuide from '@pages/ldaps_https.jsx';
 import GCPSecurityGuide from '@pages/gcp-security.jsx';
 import NTLMGuide from '@pages/ntlm.jsx';
+import PKIGuide from '@pages/pki.jsx';
 
 const pagesConfig = [
   {
@@ -99,6 +100,16 @@ const pagesConfig = [
     color: '#6366f1',
     category: 'Protocols',
     component: NTLMGuide,
+  },
+  {
+    id: 'pki',
+    path: '/pki',
+    title: 'PKI & Certificates',
+    subtitle: 'Certificate Authorities, Trust Chains, CSR Flow & OpenSSL Reference',
+    icon: '🏛',
+    color: '#10b981',
+    category: 'Protocols',
+    component: PKIGuide,
   },
   {
     id: 'gcp-security',
