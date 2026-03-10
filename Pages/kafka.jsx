@@ -11,6 +11,7 @@ const SECTIONS = [
   { id: "retention", label: "Reading & Retention", icon: "↻" },
   { id: "ksql", label: "ksqlDB & Streams", icon: "⎔" },
   { id: "whats-new", label: "What's New (4.0+)", icon: "★" },
+  { id: "message-flow", label: "Message Flow", icon: "⟶" },
 ];
 
 const palette = {
@@ -900,6 +901,134 @@ const WhatsNewSection = () => (
   </div>
 );
 
+/* ─────── MESSAGE FLOW SEQUENCE DIAGRAM ─────── */
+
+const MessageFlowSection = () => {
+  const p = palette;
+  const actors = [
+    { label: "Producer",         sub: "App / Service",       x: 88,  color: p.accent  },
+    { label: "Broker Leader",    sub: "Node 1  :9092",        x: 268, color: p.blue    },
+    { label: "Partition Log",    sub: "topic 'orders'  P0",   x: 452, color: p.green   },
+    { label: "Follower Replica", sub: "Node 2  (ISR)",        x: 632, color: p.purple  },
+    { label: "Consumer",         sub: "Group 'analytics'",    x: 820, color: p.cyan    },
+  ];
+  const LS = 74, LE = 668;
+  const steps = [
+    { from:0, to:1, y:115, label:"1. Metadata Request",      sub:"Which broker leads topic 'orders'?",     color:p.accent,  dashed:false },
+    { from:1, to:0, y:158, label:"2. Metadata Response",     sub:"P0 leader → Broker 1:9092",              color:p.green,   dashed:true  },
+    { from:0, to:1, y:200, label:"3. ProduceRequest",        sub:"batch [key, value, headers], acks=all",  color:p.accent,  dashed:false },
+    { from:1, to:2, y:243, label:"4. Append to commit log",  sub:"write at log offset N",                  color:p.blue,    dashed:false },
+    { from:2, to:1, y:288, label:"5. Write confirmed",       sub:"offset N, bytes written",                color:p.blue,    dashed:true  },
+    { from:1, to:3, y:330, label:"6. Replicate records",     sub:"ISR fetch-based replication",            color:p.purple,  dashed:false },
+    { from:3, to:1, y:374, label:"7. ISR ACK",               sub:"high-watermark advanced to N+1",         color:p.purple,  dashed:true  },
+    { from:1, to:0, y:415, label:"8. ProduceResponse",       sub:"offset: N, acks=all \u2713",              color:p.green,   dashed:true  },
+    { from:4, to:1, y:477, label:"9. FetchRequest",          sub:"P0, offset: N, maxBytes: 1 MB",          color:p.cyan,    dashed:false },
+    { from:1, to:2, y:518, label:"10. Read from offset N",   sub:"sequential disk read",                   color:p.blue,    dashed:false },
+    { from:2, to:1, y:562, label:"11. Record batch",         sub:"records [N \u2026 N+k\u22121]",           color:p.blue,    dashed:true  },
+    { from:1, to:4, y:601, label:"12. FetchResponse",        sub:"records, high-watermark: N+1",           color:p.cyan,    dashed:true  },
+    { from:4, to:1, y:641, label:"13. OffsetCommit",         sub:"group 'analytics', P0 \u2192 offset N+k", color:p.cyan,   dashed:false },
+  ];
+  return (
+    <div>
+      <h2 style={{ fontSize: 17, fontWeight: 700, color: p.text, marginBottom: 6 }}>
+        &#x27F6; End-to-End Message Flow
+      </h2>
+      <p style={{ fontSize: 13, color: p.textDim, marginBottom: 16, lineHeight: 1.6 }}>
+        Complete sequence from producer publishing a record to consumer reading it &mdash; metadata negotiation,
+        partition write, ISR replication, acknowledgement, consumer fetch, and offset commit.
+      </p>
+      <svg
+        viewBox="0 0 960 710"
+        style={{ width: "100%", display: "block", background: "#0c0f16", borderRadius: 10, border: `1px solid ${p.border}` }}
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Phase highlight rectangles */}
+        <rect x="22" y="93" width="916" height="342" rx="5"
+          fill={p.accent} fillOpacity="0.035" stroke={p.accent} strokeOpacity="0.17" strokeWidth="1" strokeDasharray="4,3"/>
+        <text x="934" y="108" textAnchor="end" fill={p.accent} fillOpacity="0.6" fontSize="9" fontWeight="700"
+          fontFamily="'IBM Plex Sans',sans-serif" letterSpacing="1.5">PRODUCE PHASE</text>
+
+        <rect x="22" y="452" width="916" height="220" rx="5"
+          fill={p.cyan} fillOpacity="0.035" stroke={p.cyan} strokeOpacity="0.17" strokeWidth="1" strokeDasharray="4,3"/>
+        <text x="934" y="467" textAnchor="end" fill={p.cyan} fillOpacity="0.6" fontSize="9" fontWeight="700"
+          fontFamily="'IBM Plex Sans',sans-serif" letterSpacing="1.5">CONSUME PHASE</text>
+
+        {/* Lifelines */}
+        {actors.map((a, i) => (
+          <line key={i} x1={a.x} y1={LS} x2={a.x} y2={LE}
+            stroke={a.color} strokeWidth="1.5" strokeDasharray="5,4" strokeOpacity="0.3"/>
+        ))}
+
+        {/* Top actor boxes */}
+        {actors.map((a, i) => (
+          <g key={i}>
+            <rect x={a.x - 57} y="13" width="114" height="50" rx="6"
+              fill={p.surfaceAlt} stroke={a.color} strokeWidth="1.5"/>
+            <text x={a.x} y="33" textAnchor="middle" fill={a.color} fontSize="11" fontWeight="700"
+              fontFamily="'IBM Plex Sans',sans-serif">{a.label}</text>
+            <text x={a.x} y="51" textAnchor="middle" fill={p.textMuted} fontSize="9"
+              fontFamily="'IBM Plex Sans',sans-serif">{a.sub}</text>
+          </g>
+        ))}
+
+        {/* Message arrows */}
+        {steps.map((s, i) => {
+          const x1 = actors[s.from].x;
+          const x2 = actors[s.to].x;
+          const right = x2 > x1;
+          const mx = (x1 + x2) / 2;
+          const lx2 = right ? x2 - 7 : x2 + 7;
+          return (
+            <g key={i}>
+              <line x1={x1} y1={s.y} x2={lx2} y2={s.y}
+                stroke={s.color} strokeWidth="1.8"
+                strokeDasharray={s.dashed ? "6,3" : "none"}/>
+              {right
+                ? <polygon points={`${x2},${s.y} ${x2 - 10},${s.y - 5} ${x2 - 10},${s.y + 5}`} fill={s.color}/>
+                : <polygon points={`${x2},${s.y} ${x2 + 10},${s.y - 5} ${x2 + 10},${s.y + 5}`} fill={s.color}/>
+              }
+              <text x={mx} y={s.y - 11} textAnchor="middle" fill={s.color} fontSize="10.5" fontWeight="600"
+                fontFamily="'IBM Plex Sans',sans-serif">{s.label}</text>
+              <text x={mx} y={s.y + 16} textAnchor="middle" fill={p.textMuted} fontSize="8.5" fontStyle="italic"
+                fontFamily="'IBM Plex Sans',sans-serif">{s.sub}</text>
+            </g>
+          );
+        })}
+
+        {/* Bottom actor boxes (close lifelines) */}
+        {actors.map((a, i) => (
+          <g key={i}>
+            <rect x={a.x - 57} y={LE} width="114" height="32" rx="6"
+              fill={p.surfaceAlt} stroke={a.color} strokeWidth="1.5" strokeOpacity="0.6"/>
+            <text x={a.x} y={LE + 21} textAnchor="middle" fill={a.color} fontSize="10" fontWeight="600"
+              fontFamily="'IBM Plex Sans',sans-serif" opacity="0.75">{a.label}</text>
+          </g>
+        ))}
+      </svg>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 20, marginTop: 14, flexWrap: "wrap", fontSize: 12, color: p.textDim }}>
+        {[
+          { c: p.accent,  l: "Producer request",  dash: false },
+          { c: p.blue,    l: "Broker \u2194 Partition", dash: false },
+          { c: p.purple,  l: "ISR Replication",   dash: false },
+          { c: p.cyan,    l: "Consumer flow",      dash: false },
+          { c: p.green,   l: "Response / ACK",     dash: true  },
+        ].map(({ c, l, dash }) => (
+          <div key={l} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <svg width="26" height="10" style={{ display: "block", flexShrink: 0 }}>
+              <line x1="0" y1="5" x2="26" y2="5" stroke={c} strokeWidth="2"
+                strokeDasharray={dash ? "5,2" : "none"}/>
+              {!dash && <polygon points="26,5 17,1 17,9" fill={c}/>}
+            </svg>
+            {l}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const sectionComponents = {
   "overview": OverviewSection,
   "producers-consumers": ProducersConsumersSection,
@@ -911,6 +1040,7 @@ const sectionComponents = {
   "retention": RetentionSection,
   "ksql": KsqlSection,
   "whats-new": WhatsNewSection,
+  "message-flow": MessageFlowSection,
 };
 
 /* ─────── MAIN APP ─────── */
