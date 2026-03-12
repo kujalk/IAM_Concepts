@@ -891,6 +891,404 @@ const WorkforceFederationSection = () => {
 };
 
 /* ═══════════════════════════════════════════════
+   TAB 5 — CLOUD LOGGING → PUB/SUB → SIEM
+═══════════════════════════════════════════════ */
+
+const LOG_SINK_ACTORS = [
+  { label: "Admin",         sub: "GCP Project Admin",    x: 75,  color: "#fbbc04" },
+  { label: "Cloud Logging", sub: "Source Project",       x: 230, color: "#4285f4" },
+  { label: "Pub/Sub Topic", sub: "SIEM Project",         x: 445, color: "#f97316" },
+  { label: "Subscription",  sub: "SIEM Project",         x: 625, color: "#06b6d4" },
+  { label: "SIEM Tool",     sub: "Splunk / Chronicle",   x: 810, color: "#34a853" },
+];
+
+const LOG_SINK_SEQ = [
+  { from:0, to:1, y:110, label:"1. Create Log Sink",           sub:"sink name, filter expression, destination Pub/Sub URI",    color:"#fbbc04", dashed:false },
+  { from:1, to:2, y:155, label:"2. Grant pubsub.publisher",    sub:"to auto-created sink SA: p-12345@gcp-sa-logging.iam...",   color:"#4285f4", dashed:false },
+  { from:2, to:1, y:206, label:"3. IAM confirmed — sink live", sub:"sink service account now authorised to publish",           color:"#f97316", dashed:true  },
+  { from:0, to:1, y:282, label:"4. Log entry generated",       sub:"[GKE pod / Cloud Run / VM / Cloud SQL / Firewall...]",     color:"#fbbc04", dashed:false },
+  { from:1, to:2, y:328, label:"5. Publish matching LogEntry", sub:"JSON payload after filter evaluation — sent to topic",     color:"#4285f4", dashed:false },
+  { from:2, to:3, y:373, label:"6. Message delivery",          sub:"at-least-once — messages retained up to 7 days",           color:"#f97316", dashed:false },
+  { from:3, to:4, y:418, label:"7. Push / Pull ingestion",     sub:"HTTPS push endpoint or subscriber pull API",               color:"#06b6d4", dashed:false },
+  { from:4, to:0, y:462, label:"8. Alert / indexed",           sub:"log searchable · triggers · dashboards in SIEM",           color:"#34a853", dashed:true  },
+];
+
+const LogSinkSIEMSection = () => {
+  const [tab, setTab] = useState("architecture");
+  const LS = 75, LE = 540;
+
+  const tabBtn = (id, icon, label) => (
+    <button key={id} onClick={() => setTab(id)} style={{
+      padding: "7px 14px", borderRadius: 8,
+      border: `1.5px solid ${tab === id ? "#fbbc04" : p.border}`,
+      background: tab === id ? "#fbbc0418" : "transparent",
+      color: tab === id ? "#fbbc04" : p.textMuted,
+      fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+      display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s",
+    }}><span>{icon}</span> {label}</button>
+  );
+
+  return (
+    <div style={{ animation: "fadeSlideUp 0.4s ease both" }}>
+      <p style={{ color: p.textDim, lineHeight: 1.8, marginBottom: 20 }}>
+        <strong style={{ color: "#fbbc04" }}>Cloud Logging Log Sinks</strong> route log entries from any GCP
+        project, folder, or organisation to an external destination. The standard SIEM integration pattern
+        exports logs via <strong style={{ color: "#f97316" }}>Pub/Sub</strong> to a dedicated security project,
+        where a SIEM tool (Splunk, Google Chronicle, Elastic) ingests and analyses them in real time.
+      </p>
+
+      {/* Tab nav */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" }}>
+        {tabBtn("architecture", "⬡", "Architecture")}
+        {tabBtn("sink-config",  "⚙", "Sink Configuration")}
+        {tabBtn("sequence",     "⟶", "Sequence Diagram")}
+        {tabBtn("iam-setup",    "🔑", "IAM & Setup")}
+      </div>
+
+      {/* ── Architecture Tab ── */}
+      {tab === "architecture" && (
+        <div>
+          <SectionTitle>⬡ Cross-Project Architecture</SectionTitle>
+          <p style={{ color: p.textDim, fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>
+            Log sinks can export to destinations in <strong style={{ color: p.text }}>different GCP projects</strong>.
+            The recommended security architecture isolates the Pub/Sub topic and SIEM consumers in a
+            dedicated <em>Security / SIEM project</em>, fully separated from source workload projects.
+          </p>
+
+          <svg viewBox="0 0 880 340" style={{ width: "100%", display: "block", background: "#0c0f16", borderRadius: 10, border: `1px solid ${p.border}`, marginBottom: 16 }}>
+            {/* Source Project box */}
+            <rect x="10" y="15" width="375" height="310" rx="8" fill="#4285f408" stroke="#4285f440" strokeWidth="1.5"/>
+            <text x="22" y="38" fill="#4285f4" fontSize="11" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif">SOURCE PROJECT</text>
+            <text x="22" y="53" fill="#5a6478" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">e.g. my-app-production</text>
+
+            {/* Cloud Resources row */}
+            {["GKE","Cloud Run","VM","App Engine"].map((r, i) => (
+              <g key={r}>
+                <rect x={22 + i*85} y="62" width="75" height="28" rx="5" fill="#4285f415" stroke="#4285f430" strokeWidth="1"/>
+                <text x={22 + i*85 + 37} y="80" textAnchor="middle" fill="#4285f4" fontSize="9.5" fontWeight="600" fontFamily="'IBM Plex Sans',sans-serif">{r}</text>
+              </g>
+            ))}
+
+            {/* Arrow: resources → Cloud Logging */}
+            <line x1="195" y1="90" x2="195" y2="115" stroke="#4285f440" strokeWidth="1.5" strokeDasharray="3,2"/>
+            <polygon points="195,119 191,110 199,110" fill="#4285f440"/>
+
+            {/* Cloud Logging box */}
+            <rect x="65" y="122" width="260" height="50" rx="7" fill="#4285f418" stroke="#4285f450" strokeWidth="1.5"/>
+            <text x="195" y="142" textAnchor="middle" fill="#4285f4" fontSize="11.5" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif">☁ Cloud Logging</text>
+            <text x="195" y="159" textAnchor="middle" fill="#5a6478" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">Log Router · Ingestion · Storage</text>
+
+            {/* Arrow: Cloud Logging → Log Sink */}
+            <line x1="195" y1="172" x2="195" y2="197" stroke="#fbbc0450" strokeWidth="1.5" strokeDasharray="3,2"/>
+            <polygon points="195,201 191,192 199,192" fill="#fbbc0450"/>
+
+            {/* Log Sink box */}
+            <rect x="52" y="204" width="286" height="82" rx="7" fill="#fbbc0412" stroke="#fbbc0445" strokeWidth="1.5"/>
+            <text x="195" y="225" textAnchor="middle" fill="#fbbc04" fontSize="11.5" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif">⬡ Log Sink</text>
+            <text x="195" y="242" textAnchor="middle" fill="#8892a4" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">filter: severity &gt;= WARNING</text>
+            <text x="195" y="257" textAnchor="middle" fill="#8892a4" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">destination: pubsub://siem-proj/topics/gcp-logs</text>
+            <text x="195" y="273" textAnchor="middle" fill="#5a6478" fontSize="8" fontFamily="'IBM Plex Sans',sans-serif">writerIdentity: p-12345@gcp-sa-logging.iam.gserviceaccount.com</text>
+
+            {/* Cross-project bezier arrow */}
+            <path d="M 338 245 C 415 245 415 100 495 100" fill="none" stroke="#fbbc04" strokeWidth="2" strokeDasharray="6,3"/>
+            <polygon points="495,100 484,95 484,105" fill="#fbbc04"/>
+            <text x="418" y="184" textAnchor="middle" fill="#fbbc04" fontSize="9.5" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif">cross-project</text>
+            <text x="418" y="197" textAnchor="middle" fill="#5a6478" fontSize="8.5" fontFamily="'IBM Plex Sans',sans-serif">log export</text>
+
+            {/* SIEM Project box */}
+            <rect x="495" y="15" width="375" height="310" rx="8" fill="#a855f708" stroke="#a855f740" strokeWidth="1.5"/>
+            <text x="507" y="38" fill="#a855f7" fontSize="11" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif">SIEM PROJECT</text>
+            <text x="507" y="53" fill="#5a6478" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">e.g. central-security-siem</text>
+
+            {/* Pub/Sub Topic */}
+            <rect x="565" y="62" width="240" height="52" rx="7" fill="#f9731618" stroke="#f9731645" strokeWidth="1.5"/>
+            <text x="685" y="83" textAnchor="middle" fill="#f97316" fontSize="11.5" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif">◈ Pub/Sub Topic</text>
+            <text x="685" y="101" textAnchor="middle" fill="#5a6478" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">gcp-logs · 7-day retention</text>
+
+            {/* Arrow */}
+            <line x1="685" y1="114" x2="685" y2="141" stroke="#f9731640" strokeWidth="1.5" strokeDasharray="3,2"/>
+            <polygon points="685,145 681,136 689,136" fill="#f9731640"/>
+
+            {/* Subscription */}
+            <rect x="565" y="148" width="240" height="50" rx="7" fill="#06b6d418" stroke="#06b6d445" strokeWidth="1.5"/>
+            <text x="685" y="168" textAnchor="middle" fill="#06b6d4" fontSize="11.5" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif">⇄ Subscription</text>
+            <text x="685" y="186" textAnchor="middle" fill="#5a6478" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">push (HTTPS) or pull</text>
+
+            {/* Arrow */}
+            <line x1="685" y1="198" x2="685" y2="227" stroke="#34a85340" strokeWidth="1.5" strokeDasharray="3,2"/>
+            <polygon points="685,231 681,222 689,222" fill="#34a85340"/>
+
+            {/* SIEM Tool */}
+            <rect x="538" y="234" width="294" height="70" rx="7" fill="#34a85318" stroke="#34a85345" strokeWidth="1.5"/>
+            <text x="685" y="256" textAnchor="middle" fill="#34a853" fontSize="11.5" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif">&#x1F6E1; SIEM Tool</text>
+            <text x="685" y="274" textAnchor="middle" fill="#8892a4" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">Splunk · Google Chronicle · Elastic</text>
+            <text x="685" y="291" textAnchor="middle" fill="#5a6478" fontSize="9" fontFamily="'IBM Plex Sans',sans-serif">ingest · index · alert · dashboard</text>
+          </svg>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {[
+              { c:"#4285f4", icon:"📥", title:"Log Sources",     text:"Every GCP service writes to Cloud Logging automatically: GKE, Cloud Run, Compute Engine, Cloud SQL, Firewall logs, Admin Activity, Data Access, VPC Flow logs and more." },
+              { c:"#fbbc04", icon:"⬡",  title:"Log Sink",        text:"A routing rule inside Cloud Logging. Defines what to export (filter expression) and where to send it (destination URI). Multiple sinks can target different destinations simultaneously." },
+              { c:"#f97316", icon:"◈",  title:"Pub/Sub Bridge",  text:"Pub/Sub decouples log production from SIEM consumption. The SIEM does not need to be always-on — messages are retained for up to 7 days so no data is lost during maintenance windows." },
+              { c:"#34a853", icon:"🛡", title:"SIEM Isolation",  text:"Placing the Pub/Sub topic in a separate project limits blast radius. The source project's sink SA only needs pubsub.publisher on that specific topic, not broad project access." },
+            ].map(({ c, icon, title, text }) => (
+              <div key={title} style={{ background: p.surfaceAlt, border: `1px solid ${p.border}`, borderLeft: `3px solid ${c}`, borderRadius: 8, padding: "14px 16px" }}>
+                <div style={{ color: c, fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{icon} {title}</div>
+                <div style={{ color: p.textDim, fontSize: 12, lineHeight: 1.7 }}>{text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sink Configuration Tab ── */}
+      {tab === "sink-config" && (
+        <div>
+          <SectionTitle>⚙ What is a Log Sink?</SectionTitle>
+          <p style={{ color: p.textDim, fontSize: 13, lineHeight: 1.7, marginBottom: 20 }}>
+            A <strong style={{ color: "#fbbc04" }}>Log Sink</strong> (logging export sink) is a resource inside
+            Cloud Logging that defines <strong style={{ color: p.text }}>what logs to export</strong> and{" "}
+            <strong style={{ color: p.text }}>where to send them</strong>. Sinks can be scoped to a project,
+            folder, or organisation.
+          </p>
+
+          {/* Sink anatomy */}
+          <div style={{ background: p.surfaceAlt, border: `1px solid #fbbc0430`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+            <div style={{ color: "#fbbc04", fontWeight: 700, marginBottom: 14 }}>Sink Resource Fields</div>
+            <div style={{ display: "grid", gap: 11 }}>
+              {[
+                { field:"name",           type:"string", ex:"security-export-sink",                                    desc:"Unique sink name within the project" },
+                { field:"destination",    type:"URI",    ex:"pubsub.googleapis.com/projects/siem-proj/topics/gcp-logs", desc:"Fully qualified resource URI for the export target" },
+                { field:"filter",         type:"string", ex:`severity >= WARNING`,                                      desc:"Log filter expression — only matching entries are exported. Empty = export everything." },
+                { field:"writerIdentity", type:"SA",     ex:"serviceAccount:p-12345@gcp-sa-logging.iam.gserviceaccount.com", desc:"Auto-created SA used to write to destination. Must be granted permission on the destination manually." },
+                { field:"includeChildren",type:"bool",   ex:"true (folder / org sinks only)",                          desc:"Export logs from all child projects/folders when scoped to a folder or organisation." },
+                { field:"disabled",       type:"bool",   ex:"false",                                                   desc:"Pause export without deleting the sink. Useful during SIEM maintenance." },
+              ].map(({ field, type, ex, desc }) => (
+                <div key={field} style={{ display: "grid", gridTemplateColumns: "150px 55px 1fr", gap: 10, alignItems: "start", fontSize: 12, borderBottom: `1px solid ${p.border}`, paddingBottom: 10 }}>
+                  <Code>{field}</Code>
+                  <Tag color={p.textMuted}>{type}</Tag>
+                  <div>
+                    <div style={{ color: p.textDim, lineHeight: 1.5 }}>{desc}</div>
+                    <div style={{ color: p.cyan, fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, marginTop: 4, opacity: 0.85 }}>{ex}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Destination types */}
+          <SectionTitle>Supported Destinations</SectionTitle>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+            {[
+              { dest:"Pub/Sub Topic",  color:"#f97316", badge:"Best for SIEM",       desc:"Real-time streaming export. Supports cross-project. SIEM can be down without losing logs — messages buffer up to 7 days." },
+              { dest:"Cloud Storage",  color:"#4285f4", badge:"Long-term archive",    desc:"Stores logs as JSON/Avro files in GCS buckets. Cost-effective for compliance retention and infrequent querying." },
+              { dest:"BigQuery",       color:"#34a853", badge:"SQL analytics",        desc:"Exports to a BQ dataset for ad-hoc SQL queries. Schema auto-detected. Great for investigation and trend analysis." },
+              { dest:"Logging Bucket", color:"#a855f7", badge:"Centralised logging",  desc:"Route logs to a _Default or custom log bucket in another project. Enables a single pane of glass for multi-project log viewing." },
+            ].map(({ dest, color, badge, desc }) => (
+              <div key={dest} style={{ background: p.surfaceAlt, border: `1px solid ${p.border}`, borderRadius: 8, padding: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span style={{ color, fontWeight: 700, fontSize: 13 }}>{dest}</span>
+                  <Tag color={color}>{badge}</Tag>
+                </div>
+                <div style={{ color: p.textDim, fontSize: 12, lineHeight: 1.65 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <SectionTitle>Common Filter Patterns</SectionTitle>
+          <div style={{ display: "grid", gap: 10 }}>
+            {[
+              { label:"All warnings and above",           filter:`severity >= WARNING` },
+              { label:"Admin Activity audit logs only",   filter:`logName:"cloudaudit.googleapis.com/activity"` },
+              { label:"GKE pod logs from a namespace",    filter:`resource.type="k8s_container"\nresource.labels.namespace_name="production"` },
+              { label:"Security Command Center findings", filter:`logName:"securitycenter.googleapis.com"` },
+              { label:"VPC firewall deny logs",           filter:`resource.type="gce_subnetwork"\nlog_id("compute.googleapis.com/firewall")` },
+              { label:"Exclude a noisy project",          filter:`severity >= WARNING\nNOT resource.labels.project_id="noisy-dev-project"` },
+            ].map(({ label, filter }) => (
+              <div key={label} style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 8, padding: 14 }}>
+                <div style={{ color: p.textDim, fontSize: 12, marginBottom: 8 }}>{label}</div>
+                <pre style={{ margin: 0, color: p.cyan, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, lineHeight: 1.6 }}>{filter}</pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sequence Diagram Tab ── */}
+      {tab === "sequence" && (
+        <div>
+          <SectionTitle>⟶ End-to-End Sequence</SectionTitle>
+          <p style={{ color: p.textDim, fontSize: 13, lineHeight: 1.7, marginBottom: 16 }}>
+            Two phases: <strong style={{ color: "#fbbc04" }}>Setup</strong> (one-time admin configuration) and{" "}
+            <strong style={{ color: "#4285f4" }}>Runtime</strong> (continuous log streaming to SIEM).
+          </p>
+
+          <svg viewBox="0 0 940 590" style={{ width: "100%", display: "block", background: "#0c0f16", borderRadius: 10, border: `1px solid ${p.border}` }}>
+            {/* Project background regions */}
+            <rect x="14" y="8" width="298" height="570" rx="6" fill="#4285f406" stroke="#4285f420" strokeWidth="1"/>
+            <text x="22" y="24" fill="#4285f4" fontSize="8.5" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif" opacity="0.55">SOURCE PROJECT</text>
+            <rect x="388" y="8" width="540" height="570" rx="6" fill="#a855f706" stroke="#a855f720" strokeWidth="1"/>
+            <text x="396" y="24" fill="#a855f7" fontSize="8.5" fontWeight="700" fontFamily="'IBM Plex Sans',sans-serif" opacity="0.55">SIEM PROJECT</text>
+
+            {/* Phase highlight boxes */}
+            <rect x="26" y="87" width="900" height="152" rx="5"
+              fill="#fbbc04" fillOpacity="0.035" stroke="#fbbc04" strokeOpacity="0.18" strokeWidth="1" strokeDasharray="4,3"/>
+            <text x="922" y="102" textAnchor="end" fill="#fbbc04" fillOpacity="0.65" fontSize="9" fontWeight="700"
+              fontFamily="'IBM Plex Sans',sans-serif" letterSpacing="1.5">SETUP PHASE</text>
+
+            <rect x="26" y="258" width="900" height="240" rx="5"
+              fill="#4285f4" fillOpacity="0.035" stroke="#4285f4" strokeOpacity="0.18" strokeWidth="1" strokeDasharray="4,3"/>
+            <text x="922" y="273" textAnchor="end" fill="#4285f4" fillOpacity="0.65" fontSize="9" fontWeight="700"
+              fontFamily="'IBM Plex Sans',sans-serif" letterSpacing="1.5">RUNTIME PHASE</text>
+
+            {/* Lifelines */}
+            {LOG_SINK_ACTORS.map((a, i) => (
+              <line key={i} x1={a.x} y1={LS} x2={a.x} y2={LE}
+                stroke={a.color} strokeWidth="1.5" strokeDasharray="5,4" strokeOpacity="0.3"/>
+            ))}
+
+            {/* Top actor boxes */}
+            {LOG_SINK_ACTORS.map((a, i) => (
+              <g key={i}>
+                <rect x={a.x - 57} y="13" width="114" height="50" rx="6"
+                  fill={p.surfaceAlt} stroke={a.color} strokeWidth="1.5"/>
+                <text x={a.x} y="34" textAnchor="middle" fill={a.color} fontSize="10.5" fontWeight="700"
+                  fontFamily="'IBM Plex Sans',sans-serif">{a.label}</text>
+                <text x={a.x} y="52" textAnchor="middle" fill={p.textMuted} fontSize="8.5"
+                  fontFamily="'IBM Plex Sans',sans-serif">{a.sub}</text>
+              </g>
+            ))}
+
+            {/* Message arrows */}
+            {LOG_SINK_SEQ.map((s, i) => {
+              const x1 = LOG_SINK_ACTORS[s.from].x;
+              const x2 = LOG_SINK_ACTORS[s.to].x;
+              const right = x2 > x1;
+              const mx = (x1 + x2) / 2;
+              const lx2 = right ? x2 - 7 : x2 + 7;
+              return (
+                <g key={i}>
+                  <line x1={x1} y1={s.y} x2={lx2} y2={s.y}
+                    stroke={s.color} strokeWidth="1.8"
+                    strokeDasharray={s.dashed ? "6,3" : "none"}/>
+                  {right
+                    ? <polygon points={`${x2},${s.y} ${x2-10},${s.y-5} ${x2-10},${s.y+5}`} fill={s.color}/>
+                    : <polygon points={`${x2},${s.y} ${x2+10},${s.y-5} ${x2+10},${s.y+5}`} fill={s.color}/>
+                  }
+                  <text x={mx} y={s.y - 11} textAnchor="middle" fill={s.color} fontSize="10.5" fontWeight="600"
+                    fontFamily="'IBM Plex Sans',sans-serif">{s.label}</text>
+                  <text x={mx} y={s.y + 16} textAnchor="middle" fill={p.textMuted} fontSize="8.5" fontStyle="italic"
+                    fontFamily="'IBM Plex Sans',sans-serif">{s.sub}</text>
+                </g>
+              );
+            })}
+
+            {/* Bottom actor boxes */}
+            {LOG_SINK_ACTORS.map((a, i) => (
+              <g key={i}>
+                <rect x={a.x - 57} y={LE} width="114" height="32" rx="6"
+                  fill={p.surfaceAlt} stroke={a.color} strokeWidth="1.5" strokeOpacity="0.6"/>
+                <text x={a.x} y={LE + 21} textAnchor="middle" fill={a.color} fontSize="10" fontWeight="600"
+                  fontFamily="'IBM Plex Sans',sans-serif" opacity="0.75">{a.label}</text>
+              </g>
+            ))}
+          </svg>
+
+          {/* Legend */}
+          <div style={{ display: "flex", gap: 20, marginTop: 14, flexWrap: "wrap", fontSize: 12, color: p.textDim }}>
+            {[
+              { c:"#fbbc04", l:"Admin action",     dash:false },
+              { c:"#4285f4", l:"Cloud Logging",    dash:false },
+              { c:"#f97316", l:"Pub/Sub",          dash:false },
+              { c:"#06b6d4", l:"Subscription",     dash:false },
+              { c:"#34a853", l:"SIEM response",    dash:true  },
+            ].map(({ c, l, dash }) => (
+              <div key={l} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <svg width="26" height="10" style={{ display: "block", flexShrink: 0 }}>
+                  <line x1="0" y1="5" x2="26" y2="5" stroke={c} strokeWidth="2" strokeDasharray={dash ? "5,2" : "none"}/>
+                  {!dash && <polygon points="26,5 17,1 17,9" fill={c}/>}
+                </svg>
+                {l}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── IAM & Setup Tab ── */}
+      {tab === "iam-setup" && (
+        <div>
+          <SectionTitle>🔑 Step-by-Step Setup</SectionTitle>
+          <div style={{ display: "grid", gap: 16 }}>
+            {[
+              {
+                step:"1", color:"#fbbc04", title:"Create Pub/Sub Topic in SIEM project",
+                desc:"Create the destination topic and subscription in your SIEM project (run as SIEM project admin):",
+                code:`# In SIEM project\ngcloud pubsub topics create gcp-logs \\\n  --project=central-security-siem\n\n# Create a pull subscription (SIEM pulls messages)\ngcloud pubsub subscriptions create gcp-logs-sub \\\n  --topic=gcp-logs \\\n  --project=central-security-siem \\\n  --ack-deadline=60`,
+              },
+              {
+                step:"2", color:"#4285f4", title:"Create the Log Sink in Source project",
+                desc:"Create the sink in the source project. Note the writerIdentity from the output — you need it for step 3:",
+                code:`# Project-level sink\ngcloud logging sinks create security-export-sink \\\n  pubsub.googleapis.com/projects/central-security-siem/topics/gcp-logs \\\n  --log-filter='severity >= WARNING' \\\n  --project=my-app-production\n\n# Folder-level sink (includes all child projects)\ngcloud logging sinks create org-security-sink \\\n  pubsub.googleapis.com/projects/central-security-siem/topics/gcp-logs \\\n  --log-filter='severity >= WARNING' \\\n  --folder=FOLDER_ID \\\n  --include-children`,
+              },
+              {
+                step:"3", color:"#f97316", title:"Grant sink SA pubsub.publisher on the topic",
+                desc:"Retrieve the auto-created writerIdentity service account and grant it publisher rights on the SIEM project's topic:",
+                code:`# Get the sink's writerIdentity\nSINK_SA=$(gcloud logging sinks describe security-export-sink \\\n  --project=my-app-production \\\n  --format='value(writerIdentity)')\n\necho "Sink SA: $SINK_SA"\n# Output: serviceAccount:p-12345@gcp-sa-logging.iam.gserviceaccount.com\n\n# Grant pubsub.publisher on the SIEM project topic\ngcloud pubsub topics add-iam-policy-binding gcp-logs \\\n  --project=central-security-siem \\\n  --member="$SINK_SA" \\\n  --role="roles/pubsub.publisher"`,
+              },
+              {
+                step:"4", color:"#34a853", title:"Verify end-to-end flow",
+                desc:"Write a test log and confirm it arrives in the Pub/Sub subscription:",
+                code:`# Write a WARNING test log in source project\ngcloud logging write test-log "SIEM export test — severity WARNING" \\\n  --severity=WARNING \\\n  --project=my-app-production\n\n# Pull one message from SIEM subscription to verify delivery\ngcloud pubsub subscriptions pull gcp-logs-sub \\\n  --project=central-security-siem \\\n  --limit=1 \\\n  --auto-ack`,
+              },
+            ].map(({ step, color, title, desc, code }) => (
+              <div key={step} style={{ background: p.surfaceAlt, border: `1px solid ${p.border}`, borderRadius: 10, padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <span style={{ background: `${color}20`, color, border: `1.5px solid ${color}40`, borderRadius: 8, padding: "4px 12px", fontWeight: 800, fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
+                    {step}
+                  </span>
+                  <span style={{ color, fontWeight: 700, fontSize: 14 }}>{title}</span>
+                </div>
+                <div style={{ color: p.textDim, fontSize: 13, lineHeight: 1.7, marginBottom: 12 }}>{desc}</div>
+                <pre style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 8, padding: 14, margin: 0, color: p.text, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace", overflowX: "auto", lineHeight: 1.65, whiteSpace: "pre-wrap" }}>{code}</pre>
+              </div>
+            ))}
+          </div>
+
+          <SectionTitle>Required IAM Roles</SectionTitle>
+          <div style={{ background: p.surfaceAlt, border: `1px solid ${p.border}`, borderRadius: 10, padding: 20 }}>
+            <div style={{ display: "grid", gap: 11 }}>
+              {[
+                { who:"Admin creating the sink",  role:"roles/logging.configWriter",   proj:"Source project",  desc:"Create, update, delete sinks" },
+                { who:"Sink service account",     role:"roles/pubsub.publisher",        proj:"SIEM project",    desc:"Publish log entries to the Pub/Sub topic — must be granted manually after sink creation" },
+                { who:"SIEM subscriber SA / tool",role:"roles/pubsub.subscriber",       proj:"SIEM project",    desc:"Pull/ack messages from the Pub/Sub subscription" },
+                { who:"SIEM subscriber SA / tool",role:"roles/pubsub.viewer",           proj:"SIEM project",    desc:"View subscription metadata and topic details" },
+              ].map(({ who, role, proj, desc }) => (
+                <div key={role + who} style={{ display: "grid", gridTemplateColumns: "160px 220px 1fr", gap: 10, alignItems: "start", borderBottom: `1px solid ${p.border}`, paddingBottom: 10, fontSize: 12 }}>
+                  <div style={{ color: p.textDim }}>{who}</div>
+                  <Code>{role}</Code>
+                  <div>
+                    <Tag color={p.blue}>{proj}</Tag>
+                    <div style={{ color: p.textMuted, marginTop: 4 }}>{desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <InfoBox color="#fbbc04" icon="⚠">
+            <strong>Critical:</strong> GCP auto-creates the sink&apos;s <Code>writerIdentity</Code> service
+            account, but you <strong>must manually grant</strong> it <Code>roles/pubsub.publisher</Code> on
+            the SIEM project&apos;s Pub/Sub topic. Until this grant is made the sink silently drops all
+            exported log entries with no error visible in the source project.
+          </InfoBox>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════
    GCP SUBPAGES REGISTRY
 ═══════════════════════════════════════════════ */
 
@@ -899,6 +1297,7 @@ const GCP_SUBPAGES = [
   { id: "cloud-identity", label: "Cloud Identity vs IAM", icon: "🪪", component: CloudIdentityIAMSection },
   { id: "workload-federation", label: "Workload Identity Federation", icon: "⚙", component: WorkloadFederationSection },
   { id: "workforce-federation", label: "Workforce Identity Federation", icon: "👥", component: WorkforceFederationSection },
+  { id: "log-sink-siem", label: "Cloud Logging → SIEM", icon: "⬡", component: LogSinkSIEMSection },
 ];
 
 /* ═══════════════════════════════════════════════
