@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import GCPLoadBalancingGuide from '@pages/gcp-load-balancing-guide.jsx';
 
 /* ── Palette ── */
 const p = {
@@ -1298,6 +1299,7 @@ const GCP_SUBPAGES = [
   { id: "workload-federation", label: "Workload Identity Federation", icon: "⚙", component: WorkloadFederationSection },
   { id: "workforce-federation", label: "Workforce Identity Federation", icon: "👥", component: WorkforceFederationSection },
   { id: "log-sink-siem", label: "Cloud Logging → SIEM", icon: "⬡", component: LogSinkSIEMSection },
+  { id: "load-balancing", label: "GCP Load Balancing", icon: "⚖", component: GCPLoadBalancingGuide },
 ];
 
 /* ═══════════════════════════════════════════════
