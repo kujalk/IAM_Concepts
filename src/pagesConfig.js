@@ -1,6 +1,7 @@
 import JWTGuide from '@pages/jwt-deep-dive.jsx';
-import SpinnakerGuide from '@pages/spinnaker.jsx';
 import OAuthGuide from '@pages/oauth2-oidc-guide.jsx';
+import SSOConceptsGuide from '@pages/sso-concepts.jsx';
+import SAMLDeepDiveGuide from '@pages/saml-deep-dive.jsx';
 import KerberosGuide from '@pages/kerberos.jsx';
 import ADGuide from '@pages/active-directory.jsx';
 import SessionCookiesGuide from '@pages/session-cookies.jsx';
@@ -31,6 +32,26 @@ const pagesConfig = [
     color: '#8b5cf6',
     category: 'Protocols',
     component: OAuthGuide,
+  },
+  {
+    id: 'sso-concepts',
+    path: '/sso-concepts',
+    title: 'SSO Concepts',
+    subtitle: 'Complete SSO Guide — Actors, Session Layers, Protocols, SP vs IdP Init & Security',
+    icon: '🔓',
+    color: '#22d3ee',
+    category: 'Protocols',
+    component: SSOConceptsGuide,
+  },
+  {
+    id: 'saml-deep-dive',
+    path: '/saml-deep-dive',
+    title: 'SAML 2.0 Deep Dive',
+    subtitle: 'Metadata Exchange, AuthnRequest, Assertions, Digital Signatures & SP Validation',
+    icon: '📋',
+    color: '#f472b6',
+    category: 'Protocols',
+    component: SAMLDeepDiveGuide,
   },
   {
     id: 'kerberos',
@@ -111,16 +132,6 @@ const pagesConfig = [
     color: '#10b981',
     category: 'Protocols',
     component: PKIGuide,
-  },
-  {
-    id: 'spinnaker',
-    path: '/spinnaker',
-    title: 'Spinnaker',
-    subtitle: 'Multi-Cloud CD — Architecture, Kubernetes & AWS Integration',
-    icon: '🔱',
-    color: '#7c3aed',
-    category: 'Miscellaneous',
-    component: SpinnakerGuide,
   },
   {
     id: 'gcp-security',
