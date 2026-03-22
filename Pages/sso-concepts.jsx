@@ -236,8 +236,22 @@ const protocols = [
   { name: "SAML 2.0",  year: "2005", format: "XML Assertions",      transport: "Browser POST/Redirect", token: "SAML Assertion",    use: "Enterprise SSO", color: C.amber },
   { name: "OIDC",      year: "2014", format: "JWT (JSON)",           transport: "HTTP Redirect + API",   token: "ID Token + Access", use: "Modern Web/Mobile", color: C.blue },
   { name: "OAuth 2.0", year: "2012", format: "Opaque / JWT",         transport: "HTTP Redirect",         token: "Access Token",      use: "API Authorization", color: C.green },
-  { name: "WS-Fed",    year: "2007", format: "XML (SAML/JWT)",       transport: "Browser Form POST",     token: "Security Token",    use: "Microsoft ecosystem", color: C.purple },
-  { name: "CAS",       year: "2002", format: "XML Tickets",          transport: "HTTP Redirect",         token: "Service Ticket",    use: "University/Portal SSO", color: C.teal },
+  { name: "Kerberos",  year: "1988", format: "Binary Tickets",       transport: "Direct (port 88)",      token: "TGT / Service Ticket", use: "Windows Domain / LAN", color: C.purple },
+  { name: "WS-Fed",    year: "2007", format: "XML (SAML/JWT)",       transport: "Browser Form POST",     token: "Security Token",    use: "Microsoft ecosystem", color: C.teal },
+  { name: "CAS",       year: "2002", format: "XML Tickets",          transport: "HTTP Redirect",         token: "Service Ticket",    use: "University/Portal SSO", color: "#06b6d4" },
+];
+
+/* ── 3-Protocol Deep Comparison ── */
+const PROTO_COMPARE = [
+  { aspect: "Era",            saml: "2005 — Enterprise era",           oidc: "2014 — Mobile/API era",       kerb: "1988 — MIT / LAN era" },
+  { aspect: "Format",         saml: "XML (verbose, signed)",           oidc: "JSON + JWT tokens",           kerb: "Binary tickets" },
+  { aspect: "Transport",      saml: "Browser redirects + POST",        oidc: "Browser redirects + REST",    kerb: "Direct network (port 88)" },
+  { aspect: "Best For",       saml: "Enterprise web apps, legacy SaaS, cross-org federation", oidc: "Mobile, SPAs, APIs, modern SaaS, social login", kerb: "Internal network, Windows domain, on-prem apps" },
+  { aspect: "Authentication", saml: "✅ Yes (core purpose)",           oidc: "✅ OIDC layer on OAuth",       kerb: "✅ Yes (ticket-based)" },
+  { aspect: "API Access",     saml: "❌ Not designed for it",          oidc: "✅ Core strength (access tokens)", kerb: "⚠️ Limited" },
+  { aspect: "Mobile",         saml: "⚠️ Possible but awkward",        oidc: "✅ First-class support",      kerb: "❌ Not designed for it" },
+  { aspect: "Token Size",     saml: "Large (2–10 KB XML)",             oidc: "Small–medium (JWT ~1 KB)",    kerb: "Small (binary ticket)" },
+  { aspect: "Examples",       saml: "Salesforce, Workday, AWS",        oidc: "Google, GitHub, Stripe",      kerb: "Windows AD, Hadoop" },
 ];
 
 /* ── Main Component ── */
@@ -256,6 +270,7 @@ export default function SSOConcepts() {
     { id: "trust", label: "Trust & Certs" },
     { id: "slo", label: "SLO / Logout" },
     { id: "security", label: "Security" },
+    { id: "realworld", label: "Real-World" },
   ];
 
   const scroll = (id) => {
@@ -595,49 +610,45 @@ export default function SSOConcepts() {
             </table>
           </div>
 
-          {/* SAML vs OIDC deep comparison */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 24 }}>
-            {[
-              {
-                color: C.amber, title: "SAML 2.0", icon: "📋",
-                points: [
-                  "XML-based, verbose but widely supported",
-                  "Assertion passed through browser via POST",
-                  "Ideal for enterprise: Salesforce, AWS, Azure",
-                  "Metadata XML defines trust relationship",
-                  "SP-Initiated and IdP-Initiated both common",
-                  "Used in government, healthcare, finance",
-                ],
-              },
-              {
-                color: C.blue, title: "OpenID Connect (OIDC)", icon: "🔑",
-                points: [
-                  "JSON/JWT-based, modern and lightweight",
-                  "Built on OAuth 2.0 authorization framework",
-                  "Native support for mobile/SPA applications",
-                  "JWKS endpoint for public key distribution",
-                  "/.well-known/openid-configuration discovery",
-                  "Preferred for cloud-native / modern apps",
-                ],
-              },
-            ].map(p => (
-              <div key={p.title} style={{
-                background: C.surface, border: `1px solid ${C.border}`,
-                borderRadius: 14, padding: 20,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                  <span style={{ fontSize: 20 }}>{p.icon}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: p.color }}>{p.title}</span>
-                </div>
-                {p.points.map((pt, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                    <span style={{ color: p.color, flexShrink: 0, fontSize: 12 }}>▸</span>
-                    <span style={{ color: C.dim, fontSize: 12.5, lineHeight: 1.6 }}>{pt}</span>
-                  </div>
+          {/* 3-Protocol deep comparison: SAML vs OIDC vs Kerberos */}
+          <div style={{ overflowX: "auto", marginTop: 28 }}>
+            <table style={{
+              width: "100%", borderCollapse: "separate", borderSpacing: 0,
+              background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
+              overflow: "hidden", fontSize: 12.5,
+            }}>
+              <thead>
+                <tr style={{ background: C.surface2 }}>
+                  <th style={{ padding: "12px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, borderBottom: `1px solid ${C.border}`, color: C.text, width: "18%" }}>Aspect</th>
+                  {[
+                    { label: "SAML 2.0",       color: C.amber },
+                    { label: "OIDC / OAuth 2.0", color: C.blue },
+                    { label: "Kerberos",         color: C.purple },
+                  ].map(h => (
+                    <th key={h.label} style={{ padding: "12px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, borderBottom: `1px solid ${C.border}`, width: "27%" }}>
+                      <span style={{ padding: "2px 10px", borderRadius: 20, background: `${h.color}18`, border: `1px solid ${h.color}40`, color: h.color, fontSize: 11, fontWeight: 700 }}>{h.label}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {PROTO_COMPARE.map((row, i) => (
+                  <tr key={row.aspect} style={{ background: i % 2 === 0 ? "transparent" : `${C.surface2}50` }}>
+                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 12, color: C.textDim || C.dim, fontFamily: "'JetBrains Mono', monospace" }}>{row.aspect}</td>
+                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}`, color: C.dim, fontSize: 12 }}>{row.saml}</td>
+                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}`, color: C.dim, fontSize: 12 }}>{row.oidc}</td>
+                    <td style={{ padding: "10px 14px", borderBottom: `1px solid ${C.border}`, color: C.dim, fontSize: 12 }}>{row.kerb}</td>
+                  </tr>
                 ))}
-              </div>
-            ))}
+              </tbody>
+            </table>
           </div>
+
+          <Callout color={C.cyan} icon="📌" title="In Practice, They Coexist">
+            Most enterprise IdPs (Okta, Azure AD, Keycloak) support <strong style={{ color: C.text }}>all three</strong> simultaneously.
+            Your Windows login uses Kerberos, your browser gets a SAML or OIDC session at the IdP, and your mobile apps use OIDC/OAuth.
+            The IdP is the bridge between all protocols — it translates one form of trust into another.
+          </Callout>
         </section>
 
         {/* ═══════════ 6. SP vs IdP INITIATION ═══════════ */}
@@ -791,7 +802,40 @@ export default function SSOConcepts() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          {/* Trust steps: A Metadata, B Certificate Pinning, C Audience Restriction */}
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, marginBottom: 20 }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700, letterSpacing: 2, color: C.dim2, textTransform: "uppercase", marginBottom: 16 }}>Trust Establishment Flow</div>
+            {[
+              {
+                step: "A", color: C.teal, title: "Metadata Exchange (One-Time Setup)",
+                desc: "The IdP publishes metadata (XML or JSON) containing its SSO endpoint URLs, entity ID, and public X.509 certificate. The SP administrator imports this metadata. Conversely, the SP provides the IdP with its ACS URL and entity ID.",
+              },
+              {
+                step: "B", color: C.teal, title: "Certificate Pinning",
+                desc: "The SP stores the IdP's public certificate. When a SAML assertion arrives, the SP uses this certificate to verify the XML digital signature. If the signature doesn't match, the assertion is rejected. In OIDC, the SP fetches the IdP's public keys from a jwks_uri endpoint and validates JWT signatures.",
+              },
+              {
+                step: "C", color: C.teal, title: "Audience Restriction",
+                desc: "Each assertion is scoped to a specific SP via an audience restriction field. A SAML assertion meant for Salesforce cannot be replayed against Jira — Jira will check the audience and reject it. This prevents one SP from impersonating another using a stolen assertion.",
+              },
+            ].map(s => (
+              <div key={s.step} style={{ display: "flex", gap: 14, marginBottom: 16, alignItems: "flex-start" }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                  background: `${s.color}18`, border: `1px solid ${s.color}40`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 13, fontWeight: 700, color: s.color, fontFamily: "'JetBrains Mono', monospace",
+                }}>{s.step}</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 4 }}>{s.title}</div>
+                  <div style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.7 }}>{s.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* IdP + SP Metadata contents */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
             {[
               {
                 color: C.amber, title: "IdP Metadata contains:", icon: "🛡️",
@@ -813,6 +857,32 @@ export default function SSOConcepts() {
                     <span style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.6 }}>{item}</span>
                   </div>
                 ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Certificate deep-dive cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            {[
+              {
+                title: "What the IdP's Certificate Proves",
+                icon: "🔏",
+                color: C.cyan,
+                desc: "The digital signature proves that the assertion was created by the IdP and not tampered with in transit — even though it passes through the user's browser. The user's browser physically carries the assertion but cannot modify it without breaking the signature.",
+              },
+              {
+                title: "Certificate Rotation",
+                icon: "🔄",
+                color: C.pink,
+                desc: "IdP certificates expire (typically yearly). When the IdP rotates its certificate, all SPs must update their stored copy — otherwise signature validation fails and SSO breaks. This is a common operational headache. OIDC's JWKS endpoint partially solves this by allowing dynamic key fetching.",
+              },
+            ].map(c => (
+              <div key={c.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ fontSize: 20 }}>{c.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: c.color }}>{c.title}</span>
+                </div>
+                <p style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.75, margin: 0 }}>{c.desc}</p>
               </div>
             ))}
           </div>
@@ -894,6 +964,83 @@ export default function SSOConcepts() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* ═══════════ 11. REAL-WORLD / ZERO-CREDENTIAL SCENARIOS ═══════════ */}
+        <section id="sso-realworld" style={{ marginBottom: 72, scrollMarginTop: 70 }}>
+          <SectionLabel>Chapter 11</SectionLabel>
+          <h2 style={{ fontSize: "clamp(26px,3.5vw,36px)", fontWeight: 300, letterSpacing: -1, marginBottom: 20 }}>
+            Common Zero-Credential Scenarios
+          </h2>
+          <p style={{ color: C.dim, fontSize: 15, lineHeight: 1.85, marginBottom: 28 }}>
+            Real-world SSO deployments combine multiple protocols in patterns that let users access everything
+            with <strong style={{ color: C.text }}>zero additional password entries</strong> after the initial login.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px,1fr))", gap: 14, marginBottom: 28 }}>
+            {[
+              {
+                icon: "🏢", color: C.purple, title: "Enterprise IWA + SAML",
+                desc: "Most common enterprise pattern: employee logs into Windows domain PC (Kerberos TGT from AD) → browser hits IdP → IdP uses Integrated Windows Authentication (IWA) to validate the Kerberos ticket → IdP session created → all SAML SPs get silent login.",
+                badge: "Zero password entry for the entire day",
+              },
+              {
+                icon: "☁️", color: C.blue, title: "Cloud-First (OIDC)",
+                desc: "Modern SaaS stack: user opens any cloud app → redirected to cloud IdP (Okta, Azure AD) → authenticates with password + MFA once → OIDC tokens issued → APIs are accessible with access tokens. OIDC is the standard for anything with a mobile app or API.",
+                badge: "One MFA prompt, all cloud apps unlocked",
+              },
+              {
+                icon: "🤝", color: C.green, title: "B2B Federation",
+                desc: "Two companies establish IdP-to-IdP trust. Company A's IdP trusts Company B's IdP. When Company A employees access Company B's apps, the assertion chain routes through both IdPs. The user never creates an account at Company B — their home IdP vouches for them.",
+                badge: "No account creation at partner org",
+              },
+              {
+                icon: "📱", color: C.pink, title: "Social Login",
+                desc: '"Sign in with Google/Apple/GitHub" is SSO using OIDC. Google is the IdP, the app is the SP. The concept is identical — it\'s just that the IdP is a consumer platform rather than an enterprise directory. One Google login unlocks thousands of apps.',
+                badge: "Consumer IdP as the trust anchor",
+              },
+              {
+                icon: "⚡", color: C.amber, title: "JIT Provisioning",
+                desc: "Just-In-Time user creation: the SP doesn't have the user in its database. When a SAML assertion arrives with a new NameID, the SP automatically creates a local user account using attributes from the assertion (name, email, roles). No manual onboarding needed.",
+                badge: "Auto-provisioned on first SSO login",
+              },
+              {
+                icon: "🔗", color: C.teal, title: "Protocol Bridging",
+                desc: "The IdP acts as a universal translator: accepts Kerberos from the desktop, speaks SAML to legacy enterprise apps, speaks OIDC to modern apps, and bridges to social IdPs. One identity, any protocol — the IdP handles the translation transparently.",
+                badge: "One identity across all protocol worlds",
+              },
+            ].map(p => (
+              <div key={p.title} style={{
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 16, padding: 22,
+                borderTop: `3px solid ${p.color}`,
+              }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                    background: `${p.color}18`, border: `1px solid ${p.color}30`,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                  }}>{p.icon}</div>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{p.title}</span>
+                </div>
+                <p style={{ fontSize: 12.5, color: C.dim, lineHeight: 1.75, marginBottom: 12 }}>{p.desc}</p>
+                <div style={{
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 700,
+                  color: p.color, background: `${p.color}12`, border: `1px solid ${p.color}30`,
+                  borderRadius: 6, padding: "5px 10px",
+                }}>↳ {p.badge}</div>
+              </div>
+            ))}
+          </div>
+
+          <Callout color={C.green} icon="🎓" title="The Mental Model">
+            SSO = <strong style={{ color: C.text }}>centralized authentication</strong> +{" "}
+            <strong style={{ color: C.text }}>distributed authorization</strong>. The IdP is the passport office,
+            tokens/assertions are the passports, SPs are border checkpoints that trust those passports.
+            Browser cookies are the pocket you keep your passport in. The whole system works because of{" "}
+            <strong style={{ color: C.text }}>pre-established cryptographic trust</strong> between IdP and SPs,
+            and <strong style={{ color: C.text }}>standard HTTP cookie behavior</strong> in browsers.
+          </Callout>
         </section>
 
       </div>
