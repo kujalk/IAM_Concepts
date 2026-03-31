@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import GCPLoadBalancingGuide from '@pages/gcp-load-balancing-guide.jsx';
+import GCPEncryptionGuide from '@pages/gcp-encryption-guide.jsx';
 
 /* ── Palette ── */
 const p = {
@@ -1300,6 +1301,7 @@ const GCP_SUBPAGES = [
   { id: "workforce-federation", label: "Workforce Identity Federation", icon: "👥", component: WorkforceFederationSection },
   { id: "log-sink-siem", label: "Cloud Logging → SIEM", icon: "⬡", component: LogSinkSIEMSection },
   { id: "load-balancing", label: "GCP Load Balancing", icon: "⚖", component: GCPLoadBalancingGuide },
+  { id: "encryption", label: "GCP Encryption", icon: "🔒", component: GCPEncryptionGuide },
 ];
 
 /* ═══════════════════════════════════════════════
